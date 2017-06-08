@@ -1,0 +1,718 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template for cross-stack core networking; VPC, DB, private and public subnets
+Parameters:
+  VPCCidrBlock:
+    Type: String
+    Description: CidrBlock of new VPC to be created
+    Default: 172.30.0.0/20
+  DBCidrBlock1:
+    Type: String
+    Description: CidrBlock of new DB Subnet to be created inside VPC
+    Default: 172.30.1.0/24
+  DBCidrBlock2:
+    Type: String
+    Description: CidrBlock of new DB Subnet to be created inside VPC
+    Default: 172.30.2.0/24
+  DBCidrBlock3:
+    Type: String
+    Description: CidrBlock of new DB Subnet to be created inside VPC
+    Default: 172.30.3.0/24
+  PrivateCidrBlock1:
+    Type: String
+    Description: CidrBlock of WebServer Subnet to be created inside VPC
+    Default: 172.30.4.0/24
+  PrivateCidrBlock2:
+    Type: String
+    Description: CidrBlock of WebServer Subnet to be created inside VPC
+    Default: 172.30.5.0/24
+  PrivateCidrBlock3:
+    Type: String
+    Description: CidrBlock of WebServer Subnet to be created inside VPC
+    Default: 172.30.6.0/24
+  PublicCidrBlock1:
+    Type: String
+    Description: CidrBlock of Public Subnet to be created inside VPC
+    Default: 172.30.7.0/24
+  PublicCidrBlock2:
+    Type: String
+    Description: CidrBlock of Public Subnet to be created inside VPC
+    Default: 172.30.8.0/24
+  PublicCidrBlock3:
+    Type: String
+    Description: CidrBlock of Public Subnet to be created inside VPC
+    Default: 172.30.9.0/24
+  NATServerAccessCidrBlock1:
+    Type: String
+    Description: CidrBlock of access to NAT instance outside of VPC
+    Default: 0.0.0.0/0
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Type: AWS::EC2::KeyPair::KeyName
+    ConstraintDescription: must be the name of an existing EC2 KeyPair.
+  VPNOrganisationName:
+    Description: Name of the Organisation
+    Type: String
+    Default: Virtuability
+  VPNOrganisationEmail:
+    Description: Email of the Organisation
+    Type: String
+    Default: admin@virtuability.com
+  VPNCidrBlock:
+    Type: String
+    Description: CidrBlock of VPN server (.1) and clients
+    Default: 10.254.0.0 255.255.255.0
+  VPNRouteToAWS:
+    Type: String
+    Description: VPN route to AWS (pushed to client)
+    Default: 172.30.0.0 255.255.240.0
+  VPNRouteToVPN:
+    Type: String
+    Description: VPN route to AWS (pushed to client)
+    Default: 10.254.0.0/24
+Mappings:
+  AWSInstanceType2NATArch:
+    t2.nano:
+      Arch: NATHVM64
+    t2.micro:
+      Arch: NATHVM64
+    t2.small:
+      Arch: NATHVM64
+    t2.medium:
+      Arch: NATHVM64
+  AWSRegionArch2NATAMI:
+    us-east-1:
+      NATHVM64: ami-258e1f33
+    us-east-2:
+      NATHVM64: ami-6793b702
+    us-west-1:
+      NATHVM64: ami-eeba9f8e
+    us-west-2:
+      NATHVM64: ami-8437a5e4
+    eu-west-1:
+      NATHVM64: ami-5bc6c23d
+    eu-west-2:
+      NATHVM64: ami-17c4d073
+    eu-central-1:
+      NATHVM64: ami-0469bb6b
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: 'true'
+      EnableDnsHostnames: 'true'
+      CidrBlock:
+        Ref: VPCCidrBlock
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+  GatewayToInternet:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId:
+        Ref: InternetGateway
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+  InternetGatewayRoute:
+    Type: AWS::EC2::Route
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      RouteTableId:
+        Ref: PublicRouteTable
+      GatewayId:
+        Ref: InternetGateway
+  PublicSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: PublicCidrBlock1
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: Public Subnet
+  PublicSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: PublicCidrBlock2
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: Public Subnet
+  PublicSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: PublicCidrBlock3
+      MapPublicIpOnLaunch: true
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: Public Subnet
+  PublicSubnetRouteTableAssoc1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet1
+  PublicSubnetRouteTableAssoc2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet2
+  PublicSubnetRouteTableAssoc3:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PublicRouteTable
+      SubnetId:
+        Ref: PublicSubnet3
+  PrivateRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+  PrivateSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: PrivateCidrBlock1
+      MapPublicIpOnLaunch: false
+      AvailabilityZone:
+        Fn::Select:
+        - 0
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: Private Subnet
+  PrivateSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: PrivateCidrBlock2
+      MapPublicIpOnLaunch: false
+      AvailabilityZone:
+        Fn::Select:
+        - 1
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: Private Subnet
+  PrivateSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: PrivateCidrBlock3
+      MapPublicIpOnLaunch: false
+      AvailabilityZone:
+        Fn::Select:
+        - 2
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: Private Subnet
+  PrivateSubnetRouteTableAssoc1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: PrivateSubnet1
+  PrivateSubnetRouteTableAssoc2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: PrivateSubnet2
+  PrivateSubnetRouteTableAssoc3:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: PrivateSubnet3
+  DBSubnet1:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: DBCidrBlock1
+      AvailabilityZone:
+        !Select
+        - 0
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: DB Subnet
+  DBSubnet2:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: DBCidrBlock2
+      AvailabilityZone:
+        !Select
+        - 1
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: DB Subnet
+  DBSubnet3:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock:
+        Ref: DBCidrBlock3
+      AvailabilityZone:
+        !Select
+        - 2
+        - Fn::GetAZs: ''
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: DB Subnet
+  DBSubnetRouteTableAssoc1:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: DBSubnet1
+  DBSubnetRouteTableAssoc2:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: DBSubnet2
+  DBSubnetRouteTableAssoc3:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId:
+        Ref: PrivateRouteTable
+      SubnetId:
+        Ref: DBSubnet3
+  DBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: Subnets available for the RDS DB Instance
+      SubnetIds:
+      - Ref: DBSubnet1
+      - Ref: DBSubnet2
+      - Ref: DBSubnet3
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+  NatSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: NAT Security Group
+      VpcId: !Ref VPC
+      SecurityGroupIngress:
+      - IpProtocol: -1
+        CidrIp:
+          Ref: VPCCidrBlock
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        CidrIp:
+          Ref: NATServerAccessCidrBlock1
+      - IpProtocol: udp
+        FromPort: '1194'
+        ToPort: '1194'
+        CidrIp:
+          Ref: NATServerAccessCidrBlock1
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+      - Key: Name
+        Value: NAT Security Group
+  NATInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  NATInstanceRolePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: NATInstancePolicy
+      PolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action:
+          - ec2:ModifyInstanceAttribute
+          - ec2:DescribeInstanceAttribute
+          - ec2:ReplaceRoute
+          - ec2:CreateRoute
+          - ec2:DescribeRouteTables
+          Resource: "*"
+      Roles:
+      - Ref: NATInstanceRole
+  NATInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - Ref: NATInstanceRole
+  NATLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    DependsOn:
+    - PrivateRouteTable
+    Metadata:
+      AWS::CloudFormation::Init:
+        config:
+          packages:
+            yum:
+              aws-cli: []
+              subversion: []
+              tcpdump: []
+              yum-cron: []
+              openvpn: []
+          files:
+            /tmp/nat_init.sh:
+              content: !Sub |
+                #!/bin/bash -ex
+                yum update -y
+                sed -i.bak 's/^\(update_messages\|download_updates\|apply_updates\) .*/\1 = yes/g' /etc/yum/yum-cron.conf
+                chkconfig yum-cron on
+                service yum-cron start
+
+                # Disable source dest check
+                INSTANCE_ID=`curl http://instance-data/latest/meta-data/instance-id`
+                aws ec2 modify-instance-attribute --instance-id $INSTANCE_ID --no-source-dest-check --region ${AWS::Region}
+
+                # Create or replace default route depending on whether it already exists
+                routecount=`aws ec2 describe-route-tables --route-table-id ${PrivateRouteTable} --region eu-west-1 --output text | egrep "^ROUTES\s+0.0.0.0/0" | wc -l`
+                if [[ $routecount -eq 0 ]] ; then
+                aws ec2 create-route --route-table-id ${PrivateRouteTable} --instance-id $INSTANCE_ID --destination-cidr-block 0.0.0.0/0 --region ${AWS::Region}
+                else
+                aws ec2 replace-route --route-table-id ${PrivateRouteTable} --instance-id $INSTANCE_ID --destination-cidr-block 0.0.0.0/0 --region ${AWS::Region}
+                fi
+
+                # Create or replace VPN route depending on whether it already exists
+                routecount=`aws ec2 describe-route-tables --route-table-id ${PublicRouteTable} --region eu-west-1 --output text | egrep "^ROUTES\s+${VPNRouteToVPN}" | wc -l`
+                if [[ $routecount -eq 0 ]] ; then
+                aws ec2 create-route --route-table-id ${PublicRouteTable} --instance-id $INSTANCE_ID --destination-cidr-block ${VPNRouteToVPN} --region ${AWS::Region}
+                else
+                aws ec2 replace-route --route-table-id ${PublicRouteTable} --instance-id $INSTANCE_ID --destination-cidr-block ${VPNRouteToVPN} --region ${AWS::Region}
+                fi
+              mode: "000700"
+              owner: "root"
+              group: "root"
+            /tmp/vpn_init.sh:
+              content: !Sub |
+                #!/bin/bash -ex
+                svn export https://github.com/OpenVPN/easy-rsa.git/trunk/easyrsa3 /etc/openvpn/easy-rsa
+                cat >/etc/openvpn/easy-rsa/vars <<-EOF
+                set_var EASYRSA_KEY_SIZE      2048
+                set_var EASYRSA_ALGO          "rsa"
+                set_var EASYRSA_DN            "cn_only"
+                set_var EASYRSA_CA_EXPIRE     3650
+                set_var EASYRSA_CERT_EXPIRE   3650
+                set_var EASYRSA_CRL_DAYS      183
+                set_var EASYRSA_REQ_COUNTRY   "Ireland"
+                set_var EASYRSA_REQ_PROVINCE  ""
+                set_var EASYRSA_REQ_CITY      ""
+                set_var EASYRSA_REQ_ORG       "${VPNOrganisationName}"
+                set_var EASYRSA_REQ_EMAIL     "${VPNOrganisationEmail}"
+                set_var EASYRSA_REQ_OU        ""
+                EOF
+                cd /etc/openvpn/easy-rsa
+                ./easyrsa init-pki
+                ./easyrsa build-ca nopass <<-EOF
+                server CA
+                EOF
+                ./easyrsa gen-dh
+                ./easyrsa build-server-full server nopass
+                cd /etc/openvpn
+                ln -s easy-rsa/pki/dh.pem dh2048.pem
+                ln -s easy-rsa/pki/ca.crt .
+                ln -s easy-rsa/pki/issued/server.crt .
+                ln -s ./easy-rsa/pki/private/server.key .
+                cat >/etc/openvpn/server.conf <<-EOF
+                port 1194
+                proto udp
+                dev tun
+                ca ca.crt
+                cert server.crt
+                key server.key
+                dh dh2048.pem
+                server ${VPNCidrBlock}
+                ifconfig-pool-persist ipp.txt
+                push "route ${VPNRouteToAWS}"
+                keepalive 10 120
+                cipher AES-256-CBC
+                comp-lzo
+                persist-key
+                persist-tun
+                status openvpn-status.log
+                verb 3
+                EOF
+                service openvpn start
+              mode: "000700"
+              owner: "root"
+              group: "root"
+            /usr/bin/build-client.sh:
+              content: !Sub |
+                #!/bin/bash
+
+                if [[ $# -ne 1 ]] ; then
+                  echo "ERROR: Please specify a client name"
+                  exit 1
+                fi
+
+                cd /etc/openvpn/easy-rsa
+
+                CLIENT_NAME=$1
+
+                ./easyrsa build-client-full $CLIENT_NAME nopass
+
+                PUBLIC_IP=$(curl http://169.254.169.254/latest/meta-data/public-ipv4)
+
+                CA_CRT=$(cat ./pki/ca.crt)
+
+                CLIENT_CRT=$(cat ./pki/issued/$CLIENT_NAME.crt)
+
+                CLIENT_KEY=$(cat ./pki/private/$CLIENT_NAME.key)
+
+                cat >$1.ovpn <<-EOF
+                client
+                proto udp
+                remote $PUBLIC_IP
+                port 1194
+                dev tun
+                nobind
+                comp-lzo
+                cipher AES-256-CBC
+
+                <ca>
+                $CA_CRT
+                </ca>
+
+                <cert>
+                $CLIENT_CRT
+                </cert>
+
+                <key>
+                $CLIENT_KEY
+                </key>
+
+                EOF
+              mode: "000700"
+              owner: "root"
+              group: "root"
+          commands:
+            nat_init:
+              command: "/tmp/nat_init.sh"
+              ignoreErrors: "false"
+            vpn_init:
+              command: "/tmp/vpn_init.sh"
+              ignoreErrors: "false"
+    Properties:
+      InstanceType: t2.nano
+      KeyName:
+        Ref: KeyName
+      SecurityGroups:
+        - Ref: NatSecurityGroup
+      ImageId:
+        Fn::FindInMap:
+        - AWSRegionArch2NATAMI
+        - Ref: AWS::Region
+        - Fn::FindInMap:
+          - AWSInstanceType2NATArch
+          - t2.nano
+          - Arch
+      AssociatePublicIpAddress: 'true'
+      IamInstanceProfile:
+        Ref: NATInstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash -xe
+          yum update -y aws-cfn-bootstrap
+          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource NATLaunchConfig --region ${AWS::Region}
+          /opt/aws/bin/cfn-signal --exit-code 0 --stack ${AWS::StackName} --resource NATServerGroup --region ${AWS::Region}
+  NATServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      AvailabilityZones:
+        Fn::GetAZs: ''
+      LaunchConfigurationName:
+        Ref: NATLaunchConfig
+      MinSize: '1'
+      MaxSize: '1'
+      DesiredCapacity: '1'
+      VPCZoneIdentifier:
+      - Ref: PublicSubnet1
+      - Ref: PublicSubnet2
+      - Ref: PublicSubnet3
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+        PropagateAtLaunch: 'true'
+      - Key: Name
+        Value: NAT
+        PropagateAtLaunch: 'true'
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: 'PT15M'
+  NatAccessSecurityGroup:
+    DependsOn:
+    - NatSecurityGroup
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Ref: VPC
+      GroupDescription: Enable various access from NAT instance to AWS VPC
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '22'
+        ToPort: '22'
+        SourceSecurityGroupId:
+          Ref: NatSecurityGroup
+      - IpProtocol: icmp
+        FromPort: '8'
+        ToPort: "-1"
+        SourceSecurityGroupId:
+          Ref: NatSecurityGroup
+      Tags:
+      - Key: Environment
+        Value:
+          Ref: AWS::StackName
+Outputs:
+  VPC:
+    Description: VPC
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VPC"
+  PublicSubnet1:
+    Description: Public Subnet 1
+    Value: !Ref PublicSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet1"
+  PublicSubnet2:
+    Description: Public Subnet 2
+    Value: !Ref PublicSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet2"
+  PublicSubnet3:
+    Description: Public Subnet 3
+    Value: !Ref PublicSubnet3
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnet3"
+  PrivateSubnet1:
+    Description: Private Subnet 1
+    Value: !Ref PrivateSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet1"
+  PrivateSubnet2:
+    Description: Private Subnet 2
+    Value: !Ref PrivateSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet2"
+  PrivateSubnet3:
+    Description: Private Subnet 3
+    Value: !Ref PrivateSubnet3
+    Export:
+      Name: !Sub "${AWS::StackName}-PrivateSubnet3"
+  DBSubnet1:
+    Description: DB Subnet 1
+    Value: !Ref DBSubnet1
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSubnet1"
+  DBSubnet2:
+    Description: DB Subnet 2
+    Value: !Ref DBSubnet2
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSubnet2"
+  DBSubnet3:
+    Description: DB Subnet 3
+    Value: !Ref DBSubnet3
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSubnet3"
+  DBSubnetGroup:
+    Description: DB Subnet Group
+    Value: !Ref DBSubnetGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-DBSubnetGroup"
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
+    Value: !Ref KeyName
+    Export:
+      Name: !Sub "${AWS::StackName}-KeyName"
+    

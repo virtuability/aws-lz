@@ -1,0 +1,10 @@
+[
+  {
+    "ParameterKey"    : "NATServerAccessCidrBlock1",
+    "ParameterValue"  : "0.0.0.0/0"
+  },
+  {
+    "ParameterKey"    : "KeyName",
+    "ParameterValue"  : "test"
+  }
+]
