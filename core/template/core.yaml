@@ -6,46 +6,57 @@ Parameters:
     Type: String
     Description: CidrBlock of new VPC to be created
     Default: 172.30.0.0/20
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   DBCidrBlock1:
     Type: String
     Description: CidrBlock of new DB Subnet to be created inside VPC
     Default: 172.30.1.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   DBCidrBlock2:
     Type: String
     Description: CidrBlock of new DB Subnet to be created inside VPC
     Default: 172.30.2.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   DBCidrBlock3:
     Type: String
     Description: CidrBlock of new DB Subnet to be created inside VPC
     Default: 172.30.3.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PrivateCidrBlock1:
     Type: String
     Description: CidrBlock of WebServer Subnet to be created inside VPC
     Default: 172.30.4.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PrivateCidrBlock2:
     Type: String
     Description: CidrBlock of WebServer Subnet to be created inside VPC
     Default: 172.30.5.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PrivateCidrBlock3:
     Type: String
     Description: CidrBlock of WebServer Subnet to be created inside VPC
     Default: 172.30.6.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PublicCidrBlock1:
     Type: String
     Description: CidrBlock of Public Subnet to be created inside VPC
     Default: 172.30.7.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PublicCidrBlock2:
     Type: String
     Description: CidrBlock of Public Subnet to be created inside VPC
     Default: 172.30.8.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   PublicCidrBlock3:
     Type: String
     Description: CidrBlock of Public Subnet to be created inside VPC
     Default: 172.30.9.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   NATServerAccessCidrBlock1:
     Type: String
     Description: CidrBlock of access to NAT instance outside of VPC
     Default: 0.0.0.0/0
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
     Type: AWS::EC2::KeyPair::KeyName
@@ -70,6 +81,14 @@ Parameters:
     Type: String
     Description: VPN route to AWS (pushed to client)
     Default: 10.254.0.0/24
+    AllowedPattern: ^(([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])\.){3}([0-9]|[1-9][0-9]|1[0-9]{2}|2[0-4][0-9]|25[0-5])(\/([0-9]|[1-2][0-9]|3[0-2]))$
+  AZNumber:
+    Type: Number
+    Description: Number of AZs required. Currently only 2 and 3 permitted.
+    Default: 3
+    AllowedValues: [2, 3]
+Conditions:
+    Create3rdAZ: !Equals [ !Ref AZNumber, 3 ]
 Mappings:
   AWSInstanceType2NATArch:
     t2.nano:
@@ -143,14 +162,10 @@ Resources:
       CidrBlock:
         Ref: PublicCidrBlock1
       MapPublicIpOnLaunch: true
-      AvailabilityZone:
-        Fn::Select:
-        - 0
-        - Fn::GetAZs: ''
+      AvailabilityZone: !Select [ 0, !GetAZs '' ]
       Tags:
       - Key: Environment
-        Value:
-          Ref: AWS::StackName
+        Value: !Ref AWS::StackName
       - Key: Name
         Value: Public Subnet
   PublicSubnet2:
@@ -172,6 +187,7 @@ Resources:
         Value: Public Subnet
   PublicSubnet3:
     Type: AWS::EC2::Subnet
+    Condition: Create3rdAZ
     Properties:
       VpcId: !Ref VPC
       CidrBlock:
@@ -203,6 +219,7 @@ Resources:
         Ref: PublicSubnet2
   PublicSubnetRouteTableAssoc3:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: Create3rdAZ
     Properties:
       RouteTableId:
         Ref: PublicRouteTable
@@ -252,6 +269,7 @@ Resources:
         Value: Private Subnet
   PrivateSubnet3:
     Type: AWS::EC2::Subnet
+    Condition: Create3rdAZ
     Properties:
       VpcId: !Ref VPC
       CidrBlock:
@@ -283,6 +301,7 @@ Resources:
         Ref: PrivateSubnet2
   PrivateSubnetRouteTableAssoc3:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: Create3rdAZ
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable
@@ -322,6 +341,7 @@ Resources:
         Value: DB Subnet
   DBSubnet3:
     Type: AWS::EC2::Subnet
+    Condition: Create3rdAZ
     Properties:
       VpcId: !Ref VPC
       CidrBlock:
@@ -352,6 +372,7 @@ Resources:
         Ref: DBSubnet2
   DBSubnetRouteTableAssoc3:
     Type: AWS::EC2::SubnetRouteTableAssociation
+    Condition: Create3rdAZ
     Properties:
       RouteTableId:
         Ref: PrivateRouteTable
@@ -361,10 +382,7 @@ Resources:
     Type: AWS::RDS::DBSubnetGroup
     Properties:
       DBSubnetGroupDescription: Subnets available for the RDS DB Instance
-      SubnetIds:
-      - Ref: DBSubnet1
-      - Ref: DBSubnet2
-      - Ref: DBSubnet3
+      SubnetIds: !If [ Create3rdAZ, [ !Ref DBSubnet1, !Ref DBSubnet2, !Ref DBSubnet3 ], [ !Ref DBSubnet1, !Ref DBSubnet2 ] ]
       Tags:
       - Key: Environment
         Value:
@@ -535,6 +553,8 @@ Resources:
                   exit 1
                 fi
 
+                echo "Generating client configuration for $CLIENT_NAME..."
+
                 cd /etc/openvpn/easy-rsa
 
                 CLIENT_NAME=$1
@@ -549,7 +569,7 @@ Resources:
 
                 CLIENT_KEY=$(cat ./pki/private/$CLIENT_NAME.key)
 
-                cat >$1.ovpn <<-EOF
+                cat >$CLIENT_NAME.ovpn <<-EOF
                 client
                 proto udp
                 remote $PUBLIC_IP
@@ -572,6 +592,8 @@ Resources:
                 </key>
 
                 EOF
+                
+                echo "Client OVPN configuration can be found here: /etc/openvpn/easy-rsa/$CLIENT_NAME.ovpn"
               mode: "000700"
               owner: "root"
               group: "root"
@@ -608,17 +630,13 @@ Resources:
   NATServerGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
     Properties:
-      AvailabilityZones:
-        Fn::GetAZs: ''
+      AvailabilityZones: !If [ Create3rdAZ, [ !Select [ 0, !GetAZs '' ], !Select [ 1, !GetAZs '' ], !Select [ 2, !GetAZs '' ] ], [ !Select [ 0, !GetAZs '' ], !Select [ 1, !GetAZs '' ] ] ]
       LaunchConfigurationName:
         Ref: NATLaunchConfig
       MinSize: '1'
       MaxSize: '1'
       DesiredCapacity: '1'
-      VPCZoneIdentifier:
-      - Ref: PublicSubnet1
-      - Ref: PublicSubnet2
-      - Ref: PublicSubnet3
+      VPCZoneIdentifier: !If [ Create3rdAZ, [ !Ref PublicSubnet1, !Ref PublicSubnet2, !Ref PublicSubnet3 ], [ !Ref PublicSubnet1, !Ref PublicSubnet2 ] ]
       Tags:
       - Key: Environment
         Value:
@@ -671,6 +689,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-PublicSubnet2"
   PublicSubnet3:
+    Condition: Create3rdAZ
     Description: Public Subnet 3
     Value: !Ref PublicSubnet3
     Export:
@@ -686,6 +705,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-PrivateSubnet2"
   PrivateSubnet3:
+    Condition: Create3rdAZ
     Description: Private Subnet 3
     Value: !Ref PrivateSubnet3
     Export:
@@ -701,6 +721,7 @@ Outputs:
     Export:
       Name: !Sub "${AWS::StackName}-DBSubnet2"
   DBSubnet3:
+    Condition: Create3rdAZ
     Description: DB Subnet 3
     Value: !Ref DBSubnet3
     Export:
@@ -715,4 +736,8 @@ Outputs:
     Value: !Ref KeyName
     Export:
       Name: !Sub "${AWS::StackName}-KeyName"
-    
+  AZNumber:
+    Description: Number of AZs created
+    Value: !Ref AZNumber
+    Export:
+      Name: !Sub "${AWS::StackName}-AZNumber"

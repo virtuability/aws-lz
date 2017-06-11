@@ -6,5 +6,9 @@
   {
     "ParameterKey"    : "KeyName",
     "ParameterValue"  : "test"
+  },
+  {
+    "ParameterKey"    : "AZNumber",
+    "ParameterValue"  : "3"
   }
 ]
