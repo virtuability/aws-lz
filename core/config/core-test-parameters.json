@@ -6,7 +6,7 @@
   {
     "ParameterKey"    : "NATInstanceType",
     "ParameterValue"  : "t2.nano"
-  }
+  },
   {
     "ParameterKey"    : "KeyName",
     "ParameterValue"  : "test"

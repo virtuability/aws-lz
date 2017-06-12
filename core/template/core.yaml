@@ -127,47 +127,39 @@ Resources:
     Properties:
       EnableDnsSupport: 'true'
       EnableDnsHostnames: 'true'
-      CidrBlock:
-        Ref: VPCCidrBlock
+      CidrBlock: !Ref VPCCidrBlock
       Tags:
       - Key: Environment
-        Value:
-          Ref: AWS::StackName
+        Value: !Ref AWS::StackName
   InternetGateway:
     Type: AWS::EC2::InternetGateway
     Properties:
       Tags:
       - Key: Environment
-        Value:
-          Ref: AWS::StackName
+        Value: !Ref AWS::StackName
   GatewayToInternet:
     Type: AWS::EC2::VPCGatewayAttachment
     Properties:
       VpcId: !Ref VPC
-      InternetGatewayId:
-        Ref: InternetGateway
+      InternetGatewayId: !Ref InternetGateway
   PublicRouteTable:
     Type: AWS::EC2::RouteTable
     Properties:
       VpcId: !Ref VPC
       Tags:
       - Key: Environment
-        Value:
-          Ref: AWS::StackName
+        Value: !Ref AWS::StackName
   InternetGatewayRoute:
     Type: AWS::EC2::Route
     Properties:
       DestinationCidrBlock: 0.0.0.0/0
-      RouteTableId:
-        Ref: PublicRouteTable
-      GatewayId:
-        Ref: InternetGateway
+      RouteTableId: !Ref PublicRouteTable
+      GatewayId: !Ref InternetGateway
   PublicSubnet1:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: PublicCidrBlock1
+      CidrBlock: !Ref PublicCidrBlock1
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       Tags:
@@ -179,8 +171,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: PublicCidrBlock2
+      CidrBlock: !Ref PublicCidrBlock2
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       Tags:
@@ -193,8 +184,7 @@ Resources:
     Condition: Create3rdAZ
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: PublicCidrBlock3
+      CidrBlock: !Ref PublicCidrBlock3
       MapPublicIpOnLaunch: true
       AvailabilityZone: !Select [ 2, !GetAZs '' ]
       Tags:
@@ -229,8 +219,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: PrivateCidrBlock1
+      CidrBlock: !Ref PrivateCidrBlock1
       MapPublicIpOnLaunch: false
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       Tags:
@@ -242,8 +231,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: PrivateCidrBlock2
+      CidrBlock: !Ref PrivateCidrBlock2
       MapPublicIpOnLaunch: false
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       Tags:
@@ -256,8 +244,7 @@ Resources:
     Condition: Create3rdAZ
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: PrivateCidrBlock3
+      CidrBlock: !Ref PrivateCidrBlock3
       MapPublicIpOnLaunch: false
       AvailabilityZone: !Select [ 2, !GetAZs '' ]
       Tags:
@@ -285,8 +272,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: DBCidrBlock1
+      CidrBlock: !Ref DBCidrBlock1
       AvailabilityZone: !Select [ 0, !GetAZs '' ]
       Tags:
       - Key: Environment
@@ -297,8 +283,7 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: DBCidrBlock2
+      CidrBlock: !Ref DBCidrBlock2
       AvailabilityZone: !Select [ 1, !GetAZs '' ]
       Tags:
       - Key: Environment
@@ -310,8 +295,7 @@ Resources:
     Condition: Create3rdAZ
     Properties:
       VpcId: !Ref VPC
-      CidrBlock:
-        Ref: DBCidrBlock3
+      CidrBlock: !Ref DBCidrBlock3
       AvailabilityZone: !Select [ 2, !GetAZs '' ]
       Tags:
       - Key: Environment
@@ -349,8 +333,7 @@ Resources:
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: -1
-        CidrIp:
-          Ref: VPCCidrBlock
+        CidrIp: !Ref VPCCidrBlock
       - IpProtocol: tcp
         FromPort: '22'
         ToPort: '22'
@@ -558,10 +541,8 @@ Resources:
               ignoreErrors: "false"
     Properties:
       InstanceType: !Ref NATInstanceType
-      KeyName:
-        Ref: KeyName
-      SecurityGroups:
-        - Ref: NatSecurityGroup
+      KeyName: !Ref KeyName
+      SecurityGroups: [ !Ref NatSecurityGroup ]
       ImageId:
         Fn::FindInMap:
         - AWSRegionArch2NATAMI
@@ -603,8 +584,7 @@ Resources:
     - NatSecurityGroup
     Type: AWS::EC2::SecurityGroup
     Properties:
-      VpcId:
-        Ref: VPC
+      VpcId: !Ref VPC
       GroupDescription: Enable various access from NAT instance to AWS VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
