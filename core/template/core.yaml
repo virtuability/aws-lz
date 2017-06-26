@@ -490,6 +490,7 @@ Resources:
                 verb 3
                 EOF
                 service openvpn start
+                chkconfig --level 345 openvpn on
               mode: "000700"
               owner: "root"
               group: "root"
