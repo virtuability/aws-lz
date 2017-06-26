@@ -451,7 +451,7 @@ Resources:
                 set_var EASYRSA_CA_EXPIRE     3650
                 set_var EASYRSA_CERT_EXPIRE   3650
                 set_var EASYRSA_CRL_DAYS      183
-                set_var EASYRSA_REQ_COUNTRY   "Ireland"
+                set_var EASYRSA_REQ_COUNTRY   "Ireland" # Need to make this a variable I think
                 set_var EASYRSA_REQ_PROVINCE  ""
                 set_var EASYRSA_REQ_CITY      ""
                 set_var EASYRSA_REQ_ORG       "${VPNOrganisationName}"
@@ -490,7 +490,6 @@ Resources:
                 verb 3
                 EOF
                 service openvpn start
-                chkconfig --level 345 openvpn on
               mode: "000700"
               owner: "root"
               group: "root"
@@ -554,6 +553,13 @@ Resources:
             vpn_init:
               command: "/tmp/vpn_init.sh"
               ignoreErrors: "false"
+          services:
+            sysvinit: 
+              openvpn: 
+                enabled: "true"
+                ensureRunning: "true"
+                files: "/etc/openvpn/server.conf"
+                sources: "/etc/openvpn"
     Properties:
       InstanceType: !Ref NATInstanceType
       KeyName: !Ref KeyName
