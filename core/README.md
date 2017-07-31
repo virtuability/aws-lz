@@ -20,6 +20,7 @@ The instructions below assume that the AWS CLI is used; but it's also possible t
     TMPL_DIR=$HOME/dev/git/cf-templates/core/template
     CNF_DIR=$HOME/dev/git/cf-templates/core/config
     STACK_NAME=core-test
+    STACK_REGION=eu-west-1
 
 3. An existing SSH key (and name) in the AWS region that the CloudFormation stack is created in
 
@@ -33,13 +34,22 @@ The following AWS CLI commands are used to validate the template and create, upd
 
     aws cloudformation validate-template --template-body file://$TMPL_DIR/core.yaml
 
-    aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://$TMPL_DIR/core.yaml --parameters file://$CNF_DIR/$STACK_NAME-parameters.json --capabilities CAPABILITY_IAM
+    aws cloudformation create-stack --stack-name $STACK_NAME --template-body file://$TMPL_DIR/core.yaml --parameters file://$CNF_DIR/$STACK_NAME-$STACK_REGION.json --capabilities CAPABILITY_IAM
 
-    aws cloudformation update-stack --stack-name $STACK_NAME --template-body file://$TMPL_DIR/core.yaml --parameters file://$CNF_DIR/$STACK_NAME-parameters.json --capabilities CAPABILITY_IAM
+    aws cloudformation update-stack --stack-name $STACK_NAME --template-body file://$TMPL_DIR/core.yaml --parameters file://$CNF_DIR/$STACK_NAME-$STACK_REGION.json --capabilities CAPABILITY_IAM
 
     aws cloudformation list-stacks --stack-status-filter CREATE_IN_PROGRESS CREATE_COMPLETE UPDATE_IN_PROGRESS UPDATE_COMPLETE DELETE_IN_PROGRESS ROLLBACK_COMPLETE ROLLBACK_IN_PROGRESS
 
     aws cloudformation delete-stack --stack-name $STACK_NAME
+
+### Change Set Validation
+
+One would be encouraged to use the change sets to validate changes before actually making them.
+
+    aws cloudformation create-change-set  --stack-name $STACK_NAME --change-set-name $STACK_NAME-1 --template-body file://$TMPL_DIR/core.yaml --parameters file://$CNF_DIR/$STACK_NAME-$STACK_REGION.json --change-set-type UPDATE --capabilities CAPABILITY_IAM
+
+    aws cloudformation execute-change-set --stack-name $STACK_NAME --change-set-name $STACK_NAME-1
+
 
 ## OpenVPN Client configuration
 
