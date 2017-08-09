@@ -50,6 +50,7 @@ One would be encouraged to use the change sets to validate changes before actual
 
     aws cloudformation execute-change-set --stack-name $STACK_NAME --change-set-name $STACK_NAME-1
 
+    aws cloudformation delete-change-set --stack-name $STACK_NAME --change-set-name $STACK_NAME-1
 
 ## OpenVPN Client configuration
 
