@@ -60,15 +60,15 @@
   },
   {
     "ParameterKey"    : "VPNCidrBlock",
-    "ParameterValue"  : "10.253.0.0 255.255.255.0"
+    "ParameterValue"  : "10.254.0.0 255.255.255.0"
   },
   {
     "ParameterKey"    : "VPNRouteToAWS",
-    "ParameterValue"  : "172.29.0.0 255.255.240.0"
+    "ParameterValue"  : "172.30.0.0 255.255.240.0"
   },
   {
     "ParameterKey"    : "VPNRouteToVPN",
-    "ParameterValue"  : "10.253.0.0/24"
+    "ParameterValue"  : "10.254.0.0/24"
   },
   {
     "ParameterKey"    : "AZNumber",

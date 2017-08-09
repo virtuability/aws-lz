@@ -125,8 +125,8 @@ Resources:
   VPC:
     Type: AWS::EC2::VPC
     Properties:
-      EnableDnsSupport: 'true'
-      EnableDnsHostnames: 'true'
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
       CidrBlock: !Ref VPCCidrBlock
       Tags:
       - Key: Environment
@@ -551,7 +551,7 @@ Resources:
           - AWSInstanceType2NATArch
           - !Ref NATInstanceType
           - Arch
-      AssociatePublicIpAddress: 'true'
+      AssociatePublicIpAddress: true
       IamInstanceProfile: !Ref NATInstanceProfile
       UserData:
         Fn::Base64: !Sub |
@@ -571,10 +571,10 @@ Resources:
       Tags:
       - Key: Environment
         Value: !Ref AWS::StackName
-        PropagateAtLaunch: 'true'
+        PropagateAtLaunch: true
       - Key: Name
         Value: NAT
-        PropagateAtLaunch: 'true'
+        PropagateAtLaunch: true
     CreationPolicy:
       ResourceSignal:
         Count: 1
