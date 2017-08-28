@@ -515,8 +515,8 @@ Resources:
       MinSize: '1'
       DesiredCapacity: !Ref WebServerGroupDesiredCapacity
       MaxSize: !Ref WebServerGroupMaxSize
-      LoadBalancerNames:
-      - !Ref PublicElasticLoadBalancer
+      TargetGroupARNs:
+      - !Ref PublicElasticLoadBalancerDefaultTargetGroup
       Tags:
       - Key: Environment
         Value: !Ref AWS::StackName
@@ -556,12 +556,17 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: UpdateCFOriginSG
         Value: true
-  PublicElasticLoadBalancer:
-    Type: AWS::ElasticLoadBalancing::LoadBalancer
+  AccessLoggingBucket:
+    Type: AWS::S3::Bucket
     Properties:
+      AccessControl: BucketOwnerFullControl
+    DeletionPolicy: Retain
+  PublicElasticLoadBalancerV2:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      Scheme: internet-facing
       SecurityGroups:
       - !Ref PublicElasticLoadBalancerSecurityGroup
-      CrossZone: true
       Subnets:
       - Fn::ImportValue:
           !Sub "${CoreStackName}-PublicSubnet1"
@@ -569,141 +574,139 @@ Resources:
           !Sub "${CoreStackName}-PublicSubnet2"
 #      - Fn::ImportValue:
 #          !Sub "${CoreStackName}-PublicSubnet3"
-      LBCookieStickinessPolicy:
-      - PolicyName: CookieBasedPolicy
-        CookieExpirationPeriod: 30
-      Listeners:
-      - LoadBalancerPort: '80'
-        InstancePort: '80'
-        Protocol: HTTP
-        PolicyNames:
-        - CookieBasedPolicy
-      HealthCheck:
-        Target: HTTP:80/health.php
-        HealthyThreshold: '2'
-        UnhealthyThreshold: '5'
-        Interval: '10'
-        Timeout: '5'
       Tags:
       - Key: Environment
         Value: !Ref AWS::StackName
-  AccessLoggingBucket:
-    Type: AWS::S3::Bucket
+  PublicElasticLoadBalancerDefaultTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
     Properties:
-      AccessControl: BucketOwnerFullControl
-    DeletionPolicy: Retain
-  CloudFrontDistribution:
-    Type: AWS::CloudFront::Distribution
+      Name: default
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-VPC"
+      Port: 80
+      Protocol: HTTP
+  PublicElasticLoadBalancerListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
     Properties:
-      DistributionConfig:
-        Origins:
-        - DomainName: !GetAtt PublicElasticLoadBalancer.DNSName
-          Id: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
-          CustomOriginConfig:
-            HTTPPort: '80'
-            HTTPSPort: '443'
-            OriginProtocolPolicy: http-only
-        Enabled: true
-        Aliases:
-          !Ref PublicWebsiteFQDNList
-        DefaultCacheBehavior:
-          TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
-          SmoothStreaming: false
-          AllowedMethods:
-          - DELETE
-          - GET
-          - HEAD
-          - OPTIONS
-          - PATCH
-          - POST
-          - PUT
-          CachedMethods:
-          - HEAD
-          - GET
-          ForwardedValues:
-            QueryString: true
-            Cookies:
-              Forward: whitelist
-              WhitelistedNames:
-              - wordpress_*
-              - wp-settings-*
-              - comment_*
-            Headers:
-            - Host
-            - CloudFront-Forwarded-Proto
-            - CloudFront-Is-Desktop-Viewer
-            - CloudFront-Is-Mobile-Viewer
-            - CloudFront-Is-Tablet-Viewer
-            - Authorization
-          ViewerProtocolPolicy: allow-all
-        CacheBehaviors:
-        - TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
-          SmoothStreaming: false
-          PathPattern: "/wp/wp-login.php"
-          MinTTL: 0
-          AllowedMethods:
-          - DELETE
-          - GET
-          - HEAD
-          - OPTIONS
-          - PATCH
-          - POST
-          - PUT
-          CachedMethods:
-          - HEAD
-          - GET
-          ForwardedValues:
-            QueryString: true
-            Cookies:
-              Forward: whitelist
-              WhitelistedNames:
-              - wordpress_*
-              - wp-settings-*
-              - comment_*
-            Headers:
-            - Host
-            - CloudFront-Forwarded-Proto
-            - CloudFront-Is-Desktop-Viewer
-            - CloudFront-Is-Mobile-Viewer
-            - CloudFront-Is-Tablet-Viewer
-            - Authorization
-          ViewerProtocolPolicy: redirect-to-https
-        - TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
-          SmoothStreaming: false
-          PathPattern: "/wp/wp-admin/*"
-          MinTTL: 0
-          AllowedMethods:
-          - DELETE
-          - GET
-          - HEAD
-          - OPTIONS
-          - PATCH
-          - POST
-          - PUT
-          CachedMethods:
-          - HEAD
-          - GET
-          ForwardedValues:
-            QueryString: true
-            Cookies:
-              Forward: whitelist
-              WhitelistedNames:
-              - wordpress_*
-              - wp-settings-*
-              - comment_*
-              - AWSELB
-              - PHPSESSID
-            Headers:
-            - Host
-            - CloudFront-Forwarded-Proto
-            - CloudFront-Is-Desktop-Viewer
-            - CloudFront-Is-Mobile-Viewer
-            - CloudFront-Is-Tablet-Viewer
-            - Authorization
-          ViewerProtocolPolicy: redirect-to-https
-        PriceClass: PriceClass_100
-        ViewerCertificate:
-          AcmCertificateArn: !Ref ACMCertificateARN
-          SslSupportMethod: sni-only
-        Logging:
-          Bucket: !GetAtt AccessLoggingBucket.DomainName
+      LoadBalancerArn: !Ref PublicElasticLoadBalancerV2
+      Port: 80
+      Protocol: HTTP 
+      DefaultActions: 
+      - Type: forward
+        TargetGroupArn: !Ref PublicElasticLoadBalancerDefaultTargetGroup
+#  CloudFrontDistribution:
+#    Type: AWS::CloudFront::Distribution
+#    Properties:
+#      DistributionConfig:
+#        Origins:
+#        - DomainName: !GetAtt PublicElasticLoadBalancerV2.DNSName
+#          Id: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancerV2 ] ]
+#          CustomOriginConfig:
+#            HTTPPort: '80'
+#            HTTPSPort: '443'
+#            OriginProtocolPolicy: http-only
+#        Enabled: true
+#        Aliases:
+#          !Ref PublicWebsiteFQDNList
+#        DefaultCacheBehavior:
+#          TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancerV2 ] ]
+#          SmoothStreaming: false
+#          AllowedMethods:
+#          - DELETE
+#          - GET
+#          - HEAD
+#          - OPTIONS
+#          - PATCH
+#          - POST
+#          - PUT
+#          CachedMethods:
+#          - HEAD
+#          - GET
+#          ForwardedValues:
+#            QueryString: true
+#            Cookies:
+#              Forward: whitelist
+#              WhitelistedNames:
+#              - wordpress_*
+#              - wp-settings-*
+#              - comment_*
+#            Headers:
+#            - Host
+#            - CloudFront-Forwarded-Proto
+#            - CloudFront-Is-Desktop-Viewer
+#            - CloudFront-Is-Mobile-Viewer
+#            - CloudFront-Is-Tablet-Viewer
+#            - Authorization
+#          ViewerProtocolPolicy: allow-all
+#        CacheBehaviors:
+#        - TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancerV2 ] ]
+#          SmoothStreaming: false
+#          PathPattern: "/wp/wp-login.php"
+#          MinTTL: 0
+#          AllowedMethods:
+#          - DELETE
+#          - GET
+#          - HEAD
+#          - OPTIONS
+#          - PATCH
+#          - POST
+#          - PUT
+#          CachedMethods:
+#          - HEAD
+#          - GET
+#          ForwardedValues:
+#            QueryString: true
+#            Cookies:
+#              Forward: whitelist
+#              WhitelistedNames:
+#              - wordpress_*
+#              - wp-settings-*
+#              - comment_*
+#            Headers:
+#            - Host
+#            - CloudFront-Forwarded-Proto
+#            - CloudFront-Is-Desktop-Viewer
+#            - CloudFront-Is-Mobile-Viewer
+#            - CloudFront-Is-Tablet-Viewer
+#            - Authorization
+#          ViewerProtocolPolicy: redirect-to-https
+#        - TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancerV2 ] ]
+#          SmoothStreaming: false
+#          PathPattern: "/wp/wp-admin/*"
+#          MinTTL: 0
+#          AllowedMethods:
+#          - DELETE
+#          - GET
+#          - HEAD
+#          - OPTIONS
+#          - PATCH
+#          - POST
+#          - PUT
+#          CachedMethods:
+#          - HEAD
+#          - GET
+#          ForwardedValues:
+#            QueryString: true
+#            Cookies:
+#              Forward: whitelist
+#              WhitelistedNames:
+#              - wordpress_*
+#              - wp-settings-*
+#              - comment_*
+#              - AWSELB
+#              - PHPSESSID
+#            Headers:
+#            - Host
+#            - CloudFront-Forwarded-Proto
+#            - CloudFront-Is-Desktop-Viewer
+#            - CloudFront-Is-Mobile-Viewer
+#            - CloudFront-Is-Tablet-Viewer
+#            - Authorization
+#          ViewerProtocolPolicy: redirect-to-https
+#        PriceClass: PriceClass_100
+#        ViewerCertificate:
+#          AcmCertificateArn: !Ref ACMCertificateARN
+#          SslSupportMethod: sni-only
+#        Logging:
+#          Bucket: !GetAtt AccessLoggingBucket.DomainName
