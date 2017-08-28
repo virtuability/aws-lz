@@ -1,0 +1,709 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: AWS CloudFormation Template WordPress with autoscaling and website on EFS storage
+Parameters:
+  CoreStackName:
+    Type: String
+    Description: Name of core stack to build on
+    Default: website-test
+  WebServerGroupDesiredCapacity:
+    Type: Number
+    Description: Desired capacity of Web Servers in WebServerGroup
+    Default: '1'
+  WebServerGroupMaxSize:
+    Type: Number
+    Description: Max capacity of Web Servers in WebServerGroup
+    Default: '3'
+  PublicWebsiteFQDNList:
+    Type: CommaDelimitedList
+    Description: Public Website Fully Qualified Domain Name
+  ACMCertificateARN:
+    Type: String
+    Description: Public Website Fully Qualified Domain Name
+  WebServerInstanceType:
+    Description: WebServer instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t2.nano
+    - t2.micro
+    - t2.small
+    - t2.medium
+    ConstraintDescription: must be a valid instance type.
+  MultiAZDatabase:
+    Default: 'false'
+    Description: Create a Multi-AZ MySQL Amazon RDS database instance
+    Type: String
+    AllowedValues:
+    - 'true'
+    - 'false'
+    ConstraintDescription: must be either true or false.
+  DBAllocatedStorage:
+    Default: '5'
+    Description: The size of the database (Gb)
+    Type: Number
+    MinValue: '5'
+    MaxValue: '1024'
+    ConstraintDescription: must be between 5 and 1024Gb.
+  DBClass:
+    Description: Database instance class
+    Type: String
+    Default: db.t2.micro
+    AllowedValues:
+    - db.t2.micro
+    - db.t2.small
+    - db.t2.medium
+    - db.t2.large
+    - db.m4.large
+    - db.m4.xlarge
+    ConstraintDescription: must select a valid database instance type.
+  DBName:
+    Default: wpdb
+    Description: The WordPress database name
+    Type: String
+    MinLength: '1'
+    MaxLength: '64'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBUser:
+    NoEcho: true
+    Description: The WordPress database admin account username
+    Type: String
+    MinLength: '1'
+    MaxLength: '16'
+    AllowedPattern: "[a-zA-Z][a-zA-Z0-9]*"
+    ConstraintDescription: must begin with a letter and contain only alphanumeric characters.
+  DBPassword:
+    NoEcho: true
+    Description: The WordPress database admin account password
+    Type: String
+    MinLength: '8'
+    MaxLength: '41'
+    AllowedPattern: "[a-zA-Z0-9]*"
+    ConstraintDescription: must contain only alphanumeric characters.
+  VolumeName:
+    Description: The name to be used for the EFS volume
+    Type: String
+    MinLength: '1'
+    Default: website-test
+  MountPoint:
+    Description: The Linux mount point for the EFS volume
+    Type: String
+    MinLength: '1'
+    Default: website
+Mappings:
+  AWSInstanceType2Arch:
+    t2.nano:
+      Arch: HVM64
+    t2.micro:
+      Arch: HVM64
+    t2.small:
+      Arch: HVM64
+    t2.medium:
+      Arch: HVM64
+  AWSRegionArch2AMI:
+    us-east-1:
+      HVM64: ami-c481fad3
+    us-west-1:
+      HVM64: ami-de347abe
+    us-west-2:
+      HVM64: ami-b04e92d0
+    eu-west-1:
+      HVM64: ami-d41d58a7
+    eu-central-1:
+      HVM64: ami-0044b96f
+Resources:
+  DBEC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-VPC"
+      GroupDescription: Database Security Group
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: 3306
+        ToPort: 3306
+        SourceSecurityGroupId: !Ref WebServerSecurityGroup
+  DBInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBName: !Ref DBName
+      Engine: MySQL
+      MultiAZ:            !Ref MultiAZDatabase
+      StorageType:        gp2
+      MasterUsername:     !Ref DBUser
+      MasterUserPassword: !Ref DBPassword
+      DBInstanceClass:    !Ref DBClass
+      AllocatedStorage:   !Ref DBAllocatedStorage
+      VPCSecurityGroups:  [ !GetAtt DBEC2SecurityGroup.GroupId ]
+      DBSubnetGroupName:
+        Fn::ImportValue:
+         !Sub "${CoreStackName}-DBSubnetGroup"
+      Tags:
+      - Key: Environment
+        Value: !Ref AWS::StackName
+    DeletionPolicy: Snapshot
+  WebServerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-VPC"
+      GroupDescription: Enable HTTP access via port 80 locked down to the ELB and SSH access
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        SourceSecurityGroupId: !Ref PublicElasticLoadBalancerSecurityGroup
+      Tags:
+      - Key: Environment
+        Value: !Ref AWS::StackName
+  MountTargetSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-VPC"
+      GroupDescription: Security group for mount target
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '2049'
+        ToPort: '2049'
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Environment
+        Value: !Ref AWS::StackName
+  FileSystem:
+    Type: AWS::EFS::FileSystem
+    Properties:
+      FileSystemTags:
+      - Key: Name
+        Value: !Ref VolumeName
+      - Key: Environment
+        Value: !Ref AWS::StackName
+    DeletionPolicy: Retain
+  MountTarget1:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-PrivateSubnet1"
+      SecurityGroups:
+      - !Ref MountTargetSecurityGroup
+  MountTarget2:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref FileSystem
+      SubnetId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-PrivateSubnet2"
+      SecurityGroups:
+      - !Ref MountTargetSecurityGroup
+#  MountTarget3:
+#    Type: AWS::EFS::MountTarget
+#    Properties:
+#      FileSystemId: !Ref FileSystem
+#      SubnetId:
+#        Fn::ImportValue:
+#          !Sub "${CoreStackName}-PrivateSubnet3"
+#      SecurityGroups:
+#      - !Ref MountTargetSecurityGroup
+  WebServerInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+  WebServerInstanceRolePolicies:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: WebServreInstanceRole
+      PolicyDocument:
+        Statement:
+        - Effect: Allow
+          Action:
+          - autoscaling:Describe*
+          - cloudformation:Describe*
+          - cloudformation:GetTemplate
+          - s3:Get*
+          - s3:ListBucket
+          Resource: "*"
+        - Effect: Allow
+          Action:
+          - logs:Create*
+          - logs:PutLogEvents
+          - s3:GetObject
+          Resource:
+          - arn:aws:logs:*:*:*
+          - arn:aws:s3:::*
+      Roles:
+      - !Ref WebServerInstanceRole
+  WebServerInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref WebServerInstanceRole
+  WebServerLaunchConfig:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Metadata:
+      AWS::CloudFormation::Init:
+        configSets:
+          wordpress_install:
+          - 01_install_cfn
+          - 02_install_tools
+          - 03_install_mount
+          - 04_install_wordpress
+          - 05_install_cloudwatchlogs_agent
+        01_install_cfn:
+          files:
+            "/etc/cfn/cfn-hup.conf":
+              content: !Sub |
+                [main]
+                stack=${AWS::StackId}
+                region=${AWS::Region}
+              mode: '000400'
+              owner: root
+              group: root
+            "/etc/cfn/hooks.d/cfn-auto-reloader.conf":
+              content: !Sub |
+                [cfn-auto-reloader-hook]
+                triggers=post.update
+                path=Resources.WebServerLaunchConfig.Metadata.AWS::CloudFormation::Init
+                action=/opt/aws/bin/cfn-init -v --resource WebServerLaunchConfig --configsets wordpress_install --region ${AWS::Region} --stack ${AWS::StackName} 
+              mode: '000400'
+              owner: root
+              group: root
+          services:
+            sysvinit:
+              cfn-hup:
+                enabled: true
+                ensureRunning: true
+                files:
+                - /etc/cfn/cfn-hup.conf
+                - /etc/cfn/hooks.d/cfn-auto-reloader.conf
+        02_install_tools:
+          packages:
+            yum:
+              yum-cron: []
+          files:
+            "/tmp/install-tools":
+              content: !Sub |
+                #!/bin/bash -xe
+                # Install yum-cron and update
+                yum update -y
+                sed -i.bak 's/^\(update_messages\|download_updates\|apply_updates\) .*/\1 = yes/g' /etc/yum/yum-cron.conf
+                chkconfig yum-cron on
+                service yum-cron start
+                yum update -y && yum install -y yum-cron && chkconfig yum-cron on && service yum-cron start
+                # Install AWS CLI
+                yum install -y aws-cli
+              mode: '000500'
+              owner: root
+              group: root
+          commands:
+            01_install:
+              command: "/tmp/install-tools"
+              cwd: "/tmp"
+        03_install_mount:
+          commands:
+            01_createdir:
+              command:
+                !Sub |
+                  mkdir /${MountPoint}
+            02_add_fstab_mount:
+              command:
+               !Sub |
+                  echo ${FileSystem}.efs.${AWS::Region}.amazonaws.com:/ /${MountPoint} nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2 0 0 >>/etc/fstab
+            03_mount:
+              command:
+                !Sub |
+                  mount /${MountPoint}
+        04_install_wordpress:
+          packages:
+            yum:
+              php71: []
+              php71-mysqlnd: []
+              php71-opcache: []
+              mysql: []
+              httpd24: []
+              git: []
+              nfs-utils: []
+          files:
+            "/etc/httpd/conf.d/vhosts.conf":
+              content:
+                !Sub |
+                  <IfModule mpm_prefork_module>
+                    StartServers 2
+                    MinSpareServers 2
+                    MaxSpareServers 4
+                    MaxConnectionsPerChild 256
+                    ServerLimit 64
+                    MaxRequestWorkers 8
+                  </IfModule>
+
+                  # =================================================
+                  # Virtual Hosts
+                  # =================================================
+                  <VirtualHost *:80>
+                      ServerAdmin webmaster@website-test.info
+                      DocumentRoot /website
+                      ServerName  www.website-test.info
+                      ServerAlias website-test.info
+                      LogFormat "%h %{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D" commona
+                      ErrorLog "logs/website-test-error_log"
+                      CustomLog "logs/website-test-access_log" commona
+
+                      KeepAlive On
+                      KeepAliveTimeout 10
+                      MaxKeepAliveRequests 256
+
+                      <Directory "/website">
+                          Options FollowSymLinks
+                          AllowOverride None
+                          Require all granted
+                      </Directory>
+                  </VirtualHost>
+              mode: '000540'
+              owner: root
+              group: apache
+            "/tmp/create-wp-config":
+              content:
+                !Sub
+                - |
+                  #!/bin/bash -xe
+                  # Disable Apache test page and thereby make vhost default page
+                  sed -i 's/^/#/g' /etc/httpd/conf.d/welcome.conf
+                  # Ensure that ELB passes host
+                  if [ ! -f /${MountPoint}/health.php ] ; then
+                    echo '<?php echo "OK"; ?>' >/${MountPoint}/health.php
+                  fi
+                  # If this is the first server then download wordpress and install
+                  if [ ! -d "/${MountPoint}/wordpress" ] ; then
+                    wget https://wordpress.org/latest.tar.gz -O /tmp/latest.tar.gz
+                    (cd /${MountPoint} ; tar xpfz /tmp/latest.tar.gz)
+                    cp /${MountPoint}/wordpress/wp-config-sample.php /${MountPoint}/wordpress/wp-config.php
+                    sed -i "s/'database_name_here'/'${DBName}'/g" /${MountPoint}/wordpress/wp-config.php
+                    sed -i "s/'username_here'/'${DBUser}'/g" /${MountPoint}/wordpress/wp-config.php
+                    sed -i "s/'password_here'/'${DBPassword}'/g" /${MountPoint}/wordpress/wp-config.php
+                    sed -i "s/'localhost'/'${DBInstance.Endpoint.Address}'/g" /${MountPoint}/wordpress/wp-config.php
+                    cp /${MountPoint}/wordpress/index.php /${MountPoint}/index.php
+                    sed -i 's|'/wp-blog-header.php'|'/wordpress/wp-blog-header.php'|g' /${MountPoint}/index.php
+                  fi
+                -
+                 ConfigS3Bucket: 
+                    Fn::ImportValue:
+                      !Sub "${CoreStackName}-ConfigS3Bucket"
+              mode: '000500'
+              owner: root
+              group: root
+          commands:
+            01_permissions:
+              command:
+                !Sub |
+                  chown -R apache:apache /${MountPoint}
+            02_configure_wordpress:
+              command:
+                !Sub |
+                  /tmp/create-wp-config
+          services:
+            sysvinit:
+              httpd:
+                enabled: true
+                ensureRunning: true
+                files:
+                - /etc/httpd/conf.d/vhosts.conf
+        05_install_cloudwatchlogs_agent:
+          files:
+            "/tmp/cwlogs/webserver.conf":
+              content:
+                !Sub |
+                  [general]
+                  state_file= /var/awslogs/agent-state
+                  
+                  [/var/log/httpd/website-access_log]
+                  file = /var/log/httpd/website-access_log
+                  log_group_name = ${AWS::StackName}
+                  log_stream_name = {instance_id}/var/log/httpd/website-access_log
+                  datetime_format = %d/%b/%Y:%H:%M:%S
+
+                  [/var/log/httpd/website-error_log]
+                  file = /var/log/httpd/website-error_log
+                  log_group_name = ${AWS::StackName}
+                  log_stream_name = {instance_id}/var/log/httpd/website-error_log
+                  datetime_format = %b %d %H:%M:%S.%f %Y
+
+                  [/var/log/messages]
+                  file = /var/log/messages
+                  log_group_name = ${AWS::StackName}
+                  log_stream_name = {instance_id}/var/log/messages
+                  datetime_format = %b %d %H:%M:%S
+
+                  [/var/log/secure]
+                  file = /var/log/secure
+                  log_group_name = ${AWS::StackName}
+                  log_stream_name = {instance_id}/var/log/secure
+                  datetime_format = %b %d %H:%M:%S
+              mode: '000400'
+              owner: apache
+              group: apache
+            "/tmp/cwlogs/install_cloudwatch_logs.sh":
+              content:
+                !Sub |
+                  # Get the CloudWatch Logs agent
+                  wget https://s3.amazonaws.com/aws-cloudwatch/downloads/latest/awslogs-agent-setup.py
+
+                  # Install the CloudWatch Logs agent
+                  python awslogs-agent-setup.py -n -r ${AWS::Region} -c /tmp/cwlogs/webserver.conf
+              mode: '000700'
+              owner: root
+              group: root
+          commands:
+            01_install:
+              command: "/tmp/cwlogs/install_cloudwatch_logs.sh"
+    Properties:
+      AssociatePublicIpAddress: false
+      ImageId:
+        Fn::FindInMap:
+        - AWSRegionArch2AMI
+        - !Ref AWS::Region
+        - Fn::FindInMap:
+          - AWSInstanceType2Arch
+          - !Ref WebServerInstanceType
+          - Arch
+      InstanceType: !Ref WebServerInstanceType
+      SecurityGroups:
+      - !Ref WebServerSecurityGroup
+      - Fn::ImportValue:
+          !Sub "${CoreStackName}-NatAccessSecurityGroup"
+      KeyName:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-KeyName"
+      IamInstanceProfile: !Ref WebServerInstanceProfile
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -xe
+            yum update -y aws-cfn-bootstrap
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource WebServerLaunchConfig --configsets wordpress_install --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal -e $? --stack ${AWS::StackName} --resource WebServerGroup --region ${AWS::Region}
+    CreationPolicy:
+      ResourceSignal:
+        Timeout: PT15M
+  WebServerGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+    - MountTarget1
+    - MountTarget2
+    Properties:
+      LaunchConfigurationName: !Ref WebServerLaunchConfig
+      VPCZoneIdentifier:
+      - Fn::ImportValue:
+          !Sub "${CoreStackName}-PrivateSubnet1"
+      - Fn::ImportValue:
+          !Sub "${CoreStackName}-PrivateSubnet2"
+#      - Fn::ImportValue:
+#          !Sub "${CoreStackName}-PrivateSubnet3"
+      MinSize: '1'
+      DesiredCapacity: !Ref WebServerGroupDesiredCapacity
+      MaxSize: !Ref WebServerGroupMaxSize
+      LoadBalancerNames:
+      - !Ref PublicElasticLoadBalancer
+      Tags:
+      - Key: Environment
+        Value: !Ref AWS::StackName
+        PropagateAtLaunch: true
+      - Key: Name
+        Value: WebServer
+        PropagateAtLaunch: true
+    CreationPolicy:
+      ResourceSignal:
+        Count: 1
+        Timeout: PT15M
+    UpdatePolicy:
+      AutoScalingRollingUpdate:
+        MinInstancesInService: '1'
+        MaxBatchSize: '1'
+        PauseTime: PT15M
+        WaitOnResourceSignals: true
+  PublicElasticLoadBalancerSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Enable HTTP/HTTPS access on port 80 to 80
+      VpcId:
+        Fn::ImportValue:
+          !Sub "${CoreStackName}-VPC"
+      SecurityGroupIngress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+      SecurityGroupEgress:
+      - IpProtocol: tcp
+        FromPort: '80'
+        ToPort: '80'
+        CidrIp: 0.0.0.0/0
+      Tags:
+      - Key: Environment
+        Value: !Ref AWS::StackName
+      - Key: UpdateCFOriginSG
+        Value: true
+  PublicElasticLoadBalancer:
+    Type: AWS::ElasticLoadBalancing::LoadBalancer
+    Properties:
+      SecurityGroups:
+      - !Ref PublicElasticLoadBalancerSecurityGroup
+      CrossZone: true
+      Subnets:
+      - Fn::ImportValue:
+          !Sub "${CoreStackName}-PublicSubnet1"
+      - Fn::ImportValue:
+          !Sub "${CoreStackName}-PublicSubnet2"
+#      - Fn::ImportValue:
+#          !Sub "${CoreStackName}-PublicSubnet3"
+      LBCookieStickinessPolicy:
+      - PolicyName: CookieBasedPolicy
+        CookieExpirationPeriod: 30
+      Listeners:
+      - LoadBalancerPort: '80'
+        InstancePort: '80'
+        Protocol: HTTP
+        PolicyNames:
+        - CookieBasedPolicy
+      HealthCheck:
+        Target: HTTP:80/health.php
+        HealthyThreshold: '2'
+        UnhealthyThreshold: '5'
+        Interval: '10'
+        Timeout: '5'
+      Tags:
+      - Key: Environment
+        Value: !Ref AWS::StackName
+  AccessLoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: BucketOwnerFullControl
+    DeletionPolicy: Retain
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+        - DomainName: !GetAtt PublicElasticLoadBalancer.DNSName
+          Id: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
+          CustomOriginConfig:
+            HTTPPort: '80'
+            HTTPSPort: '443'
+            OriginProtocolPolicy: http-only
+        Enabled: true
+        Aliases:
+          !Ref PublicWebsiteFQDNList
+        DefaultCacheBehavior:
+          TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
+          SmoothStreaming: false
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          CachedMethods:
+          - HEAD
+          - GET
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+              - wordpress_*
+              - wp-settings-*
+              - comment_*
+            Headers:
+            - Host
+            - CloudFront-Forwarded-Proto
+            - CloudFront-Is-Desktop-Viewer
+            - CloudFront-Is-Mobile-Viewer
+            - CloudFront-Is-Tablet-Viewer
+            - Authorization
+          ViewerProtocolPolicy: allow-all
+        CacheBehaviors:
+        - TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
+          SmoothStreaming: false
+          PathPattern: "/wp/wp-login.php"
+          MinTTL: 0
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          CachedMethods:
+          - HEAD
+          - GET
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+              - wordpress_*
+              - wp-settings-*
+              - comment_*
+            Headers:
+            - Host
+            - CloudFront-Forwarded-Proto
+            - CloudFront-Is-Desktop-Viewer
+            - CloudFront-Is-Mobile-Viewer
+            - CloudFront-Is-Tablet-Viewer
+            - Authorization
+          ViewerProtocolPolicy: redirect-to-https
+        - TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancer ] ]
+          SmoothStreaming: false
+          PathPattern: "/wp/wp-admin/*"
+          MinTTL: 0
+          AllowedMethods:
+          - DELETE
+          - GET
+          - HEAD
+          - OPTIONS
+          - PATCH
+          - POST
+          - PUT
+          CachedMethods:
+          - HEAD
+          - GET
+          ForwardedValues:
+            QueryString: true
+            Cookies:
+              Forward: whitelist
+              WhitelistedNames:
+              - wordpress_*
+              - wp-settings-*
+              - comment_*
+              - AWSELB
+              - PHPSESSID
+            Headers:
+            - Host
+            - CloudFront-Forwarded-Proto
+            - CloudFront-Is-Desktop-Viewer
+            - CloudFront-Is-Mobile-Viewer
+            - CloudFront-Is-Tablet-Viewer
+            - Authorization
+          ViewerProtocolPolicy: redirect-to-https
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref ACMCertificateARN
+          SslSupportMethod: sni-only
+        Logging:
+          Bucket: !GetAtt AccessLoggingBucket.DomainName
