@@ -140,6 +140,9 @@ Mappings:
     eu-central-1:
       NATHVM64: ami-0469bb6b
 Resources:
+  ConfigS3Bucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -692,3 +695,13 @@ Outputs:
     Value: !Ref AZNumber
     Export:
       Name: !Sub "${AWS::StackName}-AZNumber"
+  NatAccessSecurityGroup:
+    Description: Enable various access from NAT instance to AWS VPC
+    Value: !Ref NatAccessSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-NatAccessSecurityGroup"
+  ConfigS3Bucket:
+    Description: S3 bucket where various configuration is stored and shared by templates
+    Value: !Ref ConfigS3Bucket
+    Export:
+      Name: !Sub "${AWS::StackName}-ConfigS3Bucket"
