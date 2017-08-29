@@ -14,9 +14,12 @@ Parameters:
     Type: Number
     Description: Max capacity of Web Servers in WebServerGroup
     Default: '3'
-  PublicWebsiteFQDNList:
-    Type: CommaDelimitedList
+  PublicWebsiteName:
+    Type: String
     Description: Public Website Fully Qualified Domain Name
+  PublicWebsiteAliasList:
+    Type: String
+    Description: Comma-separated Public Website Fully Qualified Domain Aliases
   ACMCertificateARN:
     Type: String
     Description: Public Website Fully Qualified Domain Name
@@ -340,7 +343,8 @@ Resources:
           files:
             "/etc/httpd/conf.d/vhosts.conf":
               content:
-                !Sub |
+                !Sub
+                - |
                   <IfModule mpm_prefork_module>
                     StartServers 2
                     MinSpareServers 2
@@ -356,8 +360,8 @@ Resources:
                   <VirtualHost *:80>
                       ServerAdmin webmaster@website-test.info
                       DocumentRoot /website
-                      ServerName  www.website-test.info
-                      ServerAlias website-test.info
+                      ServerName  ${PublicWebsiteName}
+                      ServerAlias ${PublicWebsiteAliasSpaceList}
                       LogFormat "%h %{X-Forwarded-For}i %l %u %t \"%r\" %>s %b %D" commona
                       ErrorLog "logs/website-test-error_log"
                       CustomLog "logs/website-test-access_log" commona
@@ -372,6 +376,7 @@ Resources:
                           Require all granted
                       </Directory>
                   </VirtualHost>
+                - PublicWebsiteAliasSpaceList: !Join [ " ", !Split [ ",", !Ref PublicWebsiteAliasList ] ]
               mode: '000540'
               owner: root
               group: apache
@@ -398,22 +403,21 @@ Resources:
                     cp /${MountPoint}/wordpress/index.php /${MountPoint}/index.php
                     sed -i 's|'/wp-blog-header.php'|'/wordpress/wp-blog-header.php'|g' /${MountPoint}/index.php
                   fi
-                -
-                 ConfigS3Bucket: 
+                - ConfigS3Bucket: 
                     Fn::ImportValue:
                       !Sub "${CoreStackName}-ConfigS3Bucket"
               mode: '000500'
               owner: root
               group: root
           commands:
-            01_permissions:
-              command:
-                !Sub |
-                  chown -R apache:apache /${MountPoint}
-            02_configure_wordpress:
+            01_configure_wordpress:
               command:
                 !Sub |
                   /tmp/create-wp-config
+            02_permissions:
+              command:
+                !Sub |
+                  chown -R apache:apache /${MountPoint}
           services:
             sysvinit:
               httpd:
@@ -608,7 +612,7 @@ Resources:
 #            OriginProtocolPolicy: http-only
 #        Enabled: true
 #        Aliases:
-#          !Ref PublicWebsiteFQDNList
+#          !Ref PublicWebsiteName PublicWebsiteAliasList
 #        DefaultCacheBehavior:
 #          TargetOriginId: !Join [ "-", [ "ELB", !Ref PublicElasticLoadBalancerV2 ] ]
 #          SmoothStreaming: false
@@ -710,3 +714,9 @@ Resources:
 #          SslSupportMethod: sni-only
 #        Logging:
 #          Bucket: !GetAtt AccessLoggingBucket.DomainName
+Outputs:
+  WebsiteALBURL:
+    Description: "WordPress Website ALB URL"
+    Value: !Join [ "", [ "http://", !GetAtt PublicElasticLoadBalancerV2.DNSName, "/" ] ]
+    Export:
+      Name: !Sub "${AWS::StackName}-WebsiteALBURL"
