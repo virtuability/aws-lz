@@ -396,21 +396,113 @@ Resources:
                   #!/bin/bash -xe
                   # Disable Apache test page and thereby make vhost default page
                   sed -i 's/^/#/g' /etc/httpd/conf.d/welcome.conf
-                  # Ensure that ELB passes host
+                  # Ensure that host passes ELB health check
                   if [ ! -f /${MountPoint}/health.php ] ; then
                     echo '<?php echo "OK"; ?>' >/${MountPoint}/health.php
                   fi
                   # If this is the first server then download wordpress and install
                   if [ ! -d "/${MountPoint}/wordpress" ] ; then
+                    mkdir "/${MountPoint}/wordpress"
                     wget https://wordpress.org/latest.tar.gz -O /tmp/latest.tar.gz
                     (cd /${MountPoint} ; tar xpfz /tmp/latest.tar.gz)
-                    cp /${MountPoint}/wordpress/wp-config-sample.php /${MountPoint}/wordpress/wp-config.php
-                    sed -i "s/'database_name_here'/'${DBName}'/g" /${MountPoint}/wordpress/wp-config.php
-                    sed -i "s/'username_here'/'${DBUser}'/g" /${MountPoint}/wordpress/wp-config.php
-                    sed -i "s/'password_here'/'${DBPassword}'/g" /${MountPoint}/wordpress/wp-config.php
-                    sed -i "s/'localhost'/'${DBInstance.Endpoint.Address}'/g" /${MountPoint}/wordpress/wp-config.php
                     cp /${MountPoint}/wordpress/index.php /${MountPoint}/index.php
                     sed -i 's|'/wp-blog-header.php'|'/wordpress/wp-blog-header.php'|g' /${MountPoint}/index.php
+                  fi
+
+                  if [ ! -f "/${MountPoint}/wordpress/wp-config.php" ] ; then
+                    wp_salt=$(curl https://api.wordpress.org/secret-key/1.1/salt/)
+                    cat <<EOF >/${MountPoint}/wordpress/wp-config.php
+                  <?php
+                  /**
+                   * The base configuration for WordPress
+                   *
+                   * The wp-config.php creation script uses this file during the
+                   * installation. You don't have to use the web site, you can
+                   * copy this file to "wp-config.php" and fill in the values.
+                   *
+                   * This file contains the following configurations:
+                   *
+                   * * MySQL settings
+                   * * Secret keys
+                   * * Database table prefix
+                   * * ABSPATH
+                   *
+                   * @link https://codex.wordpress.org/Editing_wp-config.php
+                   *
+                   * @package WordPress
+                   */
+
+                  // ** MySQL settings - You can get this info from your web host ** //
+                  /** The name of the database for WordPress */
+                  define('DB_NAME', '${DBName}');
+
+                  /** MySQL database username */
+                  define('DB_USER', '${DBUser}');
+
+                  /** MySQL database password */
+                  define('DB_PASSWORD', '${DBPassword}');
+
+                  /** MySQL hostname */
+                  define('DB_HOST', '${DBInstance.Endpoint.Address}');
+
+                  /** Database Charset to use in creating database tables. */
+                  define('DB_CHARSET', 'utf8');
+
+                  /** The Database Collate type. Don't change this if in doubt. */
+                  define('DB_COLLATE', '');
+
+                  /**#@+
+                   * Authentication Unique Keys and Salts.
+                   *
+                   * Change these to different unique phrases!
+                   * You can generate these using the {@link https://api.wordpress.org/secret-key/1.1/salt/ WordPress.org secret-key service}
+                   * You can change these at any point in time to invalidate all existing cookies. This will force all users to have to log in again.
+                   *
+                   * @since 2.6.0
+                   */
+                  $wp_salt
+
+                  /**#@-*/
+
+                  /**
+                   * WordPress Database Table prefix.
+                   *
+                   * You can have multiple installations in one database if you give each
+                   * a unique prefix. Only numbers, letters, and underscores please!
+                   */
+                  \$table_prefix  = 'wp_';
+
+                  /**
+                   * For developers: WordPress debugging mode.
+                   *
+                   * Change this to true to enable the display of notices during development.
+                   * It is strongly recommended that plugin and theme developers use WP_DEBUG
+                   * in their development environments.
+                   *
+                   * For information on other constants that can be used for debugging,
+                   * visit the Codex.
+                   *
+                   * @link https://codex.wordpress.org/Debugging_in_WordPress
+                   */
+                  define('WP_DEBUG', false);
+                  // define('WP_DEBUG', true);
+                  // define( 'WP_DEBUG_DISPLAY', false );
+                  // define( 'WP_DEBUG_LOG', true );
+                  define('FORCE_SSL_ADMIN', true);
+
+                  /** Detect if SSL is used. This is required since we are terminating SSL either on CloudFront or on ELB */
+                  if ((\$_SERVER['HTTP_CLOUDFRONT_FORWARDED_PROTO'] == 'https') OR (\$_SERVER['HTTP_X_FORWARDED_PROTO'] == 'https'))
+                  { \$_SERVER['HTTPS']='on'; }
+
+                  /* That's all, stop editing! Happy blogging. */
+
+                  /** Absolute path to the WordPress directory. */
+                  if ( !defined('ABSPATH') )
+                          define('ABSPATH', dirname(__FILE__) . '/');
+
+                  /** Sets up WordPress vars and included files. */
+                  require_once(ABSPATH . 'wp-settings.php');
+                  EOF
                   fi
                 - ConfigS3Bucket: 
                     Fn::ImportValue:
