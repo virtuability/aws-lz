@@ -816,6 +816,7 @@ Resources:
           SslSupportMethod: sni-only
         Logging:
           Bucket: !GetAtt AccessLoggingBucket.DomainName
+        WebACLId: !Ref WAFWebACL
   DNSPublicWebsiteName:
     Type: AWS::Route53::RecordSet
     Properties:
@@ -834,6 +835,136 @@ Resources:
       HostedZoneId: !Ref DNSHostedZoneId
       Name: !Ref PublicWebsiteNakedName
       Type: A
+  WAFManualAllowSet:
+    Type: AWS::WAF::IPSet
+    Properties:
+      Name: Manual Allow Set
+  WAFManualBlockSet:
+    Type: AWS::WAF::IPSet
+    Properties:
+      Name: Manual Block Set
+  WAFAutoBlockSet:
+    Type: AWS::WAF::IPSet
+    Properties:
+      Name: Auto Block Set
+  WAFAutoCountSet:
+    Type: AWS::WAF::IPSet
+    Properties:
+      Name: Auto Count Set
+  WAFWPAdminMatchSet:
+    Type: AWS::WAF::ByteMatchSet
+    Properties:
+      Name: WP Admin Set
+      ByteMatchTuples:
+      - FieldToMatch:
+          Type: URI
+        PositionalConstraint: STARTS_WITH
+        TargetString: "/wp/wp-login.php"
+        TextTransformation: LOWERCASE
+      - FieldToMatch:
+          Type: URI
+        PositionalConstraint: STARTS_WITH
+        TargetString: "/wp/wp-admin/"
+        TextTransformation: LOWERCASE
+  WAFManualAllowRule:
+    Type: AWS::WAF::Rule
+    DependsOn: WAFManualAllowSet
+    Properties:
+      Name: Manual Allow Rule
+      MetricName: ManualAllowRule
+      Predicates:
+      - DataId:
+          Ref: WAFManualAllowSet
+        Negated: false
+        Type: IPMatch
+  WAFManualBlockRule:
+    Type: AWS::WAF::Rule
+    DependsOn: WAFManualBlockSet
+    Properties:
+      Name: Manual Block Rule
+      MetricName: ManualBlockRule
+      Predicates:
+      - DataId:
+          Ref: WAFManualBlockSet
+        Negated: false
+        Type: IPMatch
+  WAFAutoBlockRule:
+    Type: AWS::WAF::Rule
+    DependsOn: WAFAutoBlockSet
+    Properties:
+      Name: Auto Block Rule
+      MetricName: AutoBlockRule
+      Predicates:
+      - DataId:
+          Ref: WAFAutoBlockSet
+        Negated: false
+        Type: IPMatch
+  WAFWPAdminBlockRule:
+    Type: AWS::WAF::Rule
+    DependsOn:
+    - WAFManualAllowSet
+    - WAFWPAdminMatchSet
+    Properties:
+      Name: WP Admin Block Rule
+      MetricName: WPAdminBlockRule
+      Predicates:
+      - DataId:
+          Ref: WAFManualAllowSet
+        Negated: true
+        Type: IPMatch
+      - DataId:
+          Ref: WAFWPAdminMatchSet
+        Negated: false
+        Type: ByteMatch
+  WAFAutoCountRule:
+    Type: AWS::WAF::Rule
+    DependsOn: WAFAutoCountSet
+    Properties:
+      Name: Auto Count Rule
+      MetricName: AutoCountRule
+      Predicates:
+      - DataId:
+          Ref: WAFAutoCountSet
+        Negated: false
+        Type: IPMatch
+  WAFWebACL:
+    Type: AWS::WAF::WebACL
+    DependsOn:
+    - WAFManualAllowRule
+    - WAFManualBlockRule
+    - WAFAutoBlockRule
+    - WAFAutoCountRule
+    Properties:
+      Name: Malicious Requesters
+      DefaultAction:
+        Type: ALLOW
+      MetricName: MaliciousRequesters
+      Rules:
+      - Action:
+          Type: ALLOW
+        Priority: 1
+        RuleId:
+          Ref: WAFManualAllowRule
+      - Action:
+          Type: BLOCK
+        Priority: 2
+        RuleId:
+          Ref: WAFManualBlockRule
+      - Action:
+          Type: BLOCK
+        Priority: 3
+        RuleId:
+          Ref: WAFAutoBlockRule
+      - Action:
+          Type: BLOCK
+        Priority: 4
+        RuleId:
+          Ref: WAFWPAdminBlockRule
+      - Action:
+          Type: COUNT
+        Priority: 5
+        RuleId:
+          Ref: WAFAutoCountRule
 Outputs:
   WebsiteURL:
     Description: "WordPress Website URL"
