@@ -5,7 +5,7 @@ Parameters:
   CoreStackName:
     Type: String
     Description: Name of core stack to build on
-    Default: website-test
+    Default: core-test
   WebServerGroupDesiredCapacity:
     Type: Number
     Description: Desired capacity of Web Servers in WebServerGroup
@@ -391,8 +391,7 @@ Resources:
               group: apache
             "/tmp/create-wp-config":
               content:
-                !Sub
-                - |
+                !Sub |
                   #!/bin/bash -xe
                   # Disable Apache test page and thereby make vhost default page
                   sed -i 's/^/#/g' /etc/httpd/conf.d/welcome.conf
@@ -504,9 +503,6 @@ Resources:
                   require_once(ABSPATH . 'wp-settings.php');
                   EOF
                   fi
-                - ConfigS3Bucket: 
-                    Fn::ImportValue:
-                      !Sub "${CoreStackName}-ConfigS3Bucket"
               mode: '000500'
               owner: root
               group: root
@@ -659,8 +655,12 @@ Resources:
       Tags:
       - Key: Environment
         Value: !Ref AWS::StackName
-      - Key: UpdateCFOriginSG
+      - Key: Name
+        Value: cloudfront
+      - Key: AutoUpdate
         Value: true
+      - Key: Protocol
+        Value: http
   AccessLoggingBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -835,6 +835,81 @@ Resources:
       HostedZoneId: !Ref DNSHostedZoneId
       Name: !Ref PublicWebsiteNakedName
       Type: A
+  UpdateCFOriginSGLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: "/"
+      Policies:
+      - PolicyName: LogsAccess
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Resource: arn:aws:logs:*:*:*
+      - PolicyName: EC2Access
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - ec2:DescribeSecurityGroups
+            - ec2:AuthorizeSecurityGroupIngress
+            - ec2:RevokeSecurityGroupIngress
+            Resource: "*"
+  UpdateCFOriginSGLambdaFunction:
+    Type: AWS::Lambda::Function
+    DependsOn: UpdateCFOriginSGLambdaRole
+    Properties:
+      Description: ''
+      Handler: update_security_groups.lambda_handler
+      Role:
+        Fn::GetAtt:
+        - UpdateCFOriginSGLambdaRole
+        - Arn
+      Code:
+        S3Bucket:
+          Fn::ImportValue:
+            !Sub "${CoreStackName}-ConfigS3Bucket"
+        S3Key: "wordpress/lambda/update_security_groups.zip"
+      Runtime: python2.7
+      MemorySize: '128'
+      Timeout: '10'
+  UpdateCFOriginSGScheduleRule:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(60 minutes)
+      Targets:
+      - Id: UpdateCFOriginSGLambdaScheduler
+        Arn:
+          Fn::GetAtt:
+          - UpdateCFOriginSGLambdaFunction
+          - Arn
+  InvokeUpdateCFOriginSGLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Fn::GetAtt:
+        - UpdateCFOriginSGLambdaFunction
+        - Arn
+      Action: lambda:InvokeFunction
+      Principal: events.amazonaws.com
+      SourceArn:
+        Fn::GetAtt:
+        - UpdateCFOriginSGScheduleRule
+        - Arn
   WAFManualAllowSet:
     Type: AWS::WAF::IPSet
     Properties:

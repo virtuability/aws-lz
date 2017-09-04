@@ -22,11 +22,15 @@ The instructions below assume that the AWS CLI is used; but it's also possible t
 
 4. Creation or adjustment of parameters as required in the parameter file cf-templates/wordpress/config/$STACK_NAME-$AWS_DEFAULT_REGION.json
 
-5. Route 53 domain registration and associated email (to validate ownership of domain). Note that: it is easy to set-up AWS WorkMail for this very purpose
+5. Copy the update_security_groups.py lambda zip file from cf-templates/wordpress/lambda/updater.zip to the core s3 bucket (as /website/lambda/updater.zip), e.g.
 
-6. An AWS Certificate Manager certificate in us-east-1 (CloudFront) containing all virtual host names of the domain(s) (e.g. website-test.info and *.website-test.info names)
+     aws s3 cp wordpress/lambda/update_security_groups.zip s3://core-test-configs3bucket-xxxxxxxxxxxx/wordpress/lambda/update_security_groups.zip
 
-6. Create a suitable website/apache/vhosts.conf file for the website in the core stack ConfigS3Bucket
+  Note: The lambda code was sourced from the AWS repository: https://github.com/awslabs/aws-cloudfront-samples
+
+6. Route 53 domain registration and associated email (to validate ownership of domain). Note that it is easy to set-up AWS WorkMail for this very purpose
+
+7. An AWS Certificate Manager certificate in us-east-1 (CloudFront) containing all virtual host names of the domain(s) (e.g. website-test.info and *.website-test.info names)
 
 
 ## Stack Creation
