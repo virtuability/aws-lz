@@ -1,2 +1,2 @@
-# cf-templates
+# cfn-templates
 A variety of Cloudformation templates
