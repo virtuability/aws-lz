@@ -71,8 +71,8 @@ Parameters:
   NATInstanceType:
     Type: String
     Description: NAT instance type
-    Default: t2.nano
-    AllowedValues: [t2.nano, t2.micro, t2.small, t2.medium]
+    Default: t3.nano
+    AllowedValues: [t3.nano, t3.micro, t3.small, t3.medium, t3.large, t3.xlarge, t3.2xlarge]
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
     Type: AWS::EC2::KeyPair::KeyName
@@ -116,29 +116,38 @@ Conditions:
     Create3rdAZ: !Equals [ !Ref AZNumber, 3 ]
 Mappings:
   AWSInstanceType2NATArch:
-    t2.nano:
+    t3.nano:
       Arch: NATHVM64
-    t2.micro:
+    t3.micro:
       Arch: NATHVM64
-    t2.small:
+    t3.small:
       Arch: NATHVM64
-    t2.medium:
+    t3.medium:
       Arch: NATHVM64
+    t3.large:
+      Arch: NATHVM64
+    t3.xlarge:
+      Arch: NATHVM64
+    t3.2xlarge:
+      Arch: NATHVM64
+# Find latest images in each region:
+#  aws ec2 describe-images --owners amazon --filters 'Name=name,Values=amzn-ami-vpc-nat-hvm-????.??.?.????????-x86_64-ebs' \
+#    'Name=state,Values=available' --output json --region <region> | jq -r '.Images | sort_by(.CreationDate) | last(.[]).ImageId'
   AWSRegionArch2NATAMI:
     us-east-1:
-      NATHVM64: ami-258e1f33
+      NATHVM64: ami-00a9d4a05375b2763
     us-east-2:
-      NATHVM64: ami-6793b702
+      NATHVM64: ami-00d1f8201864cc10c
     us-west-1:
-      NATHVM64: ami-eeba9f8e
+      NATHVM64: ami-097ad469381034fa2
     us-west-2:
-      NATHVM64: ami-8437a5e4
+      NATHVM64: ami-0b840e8a1ce4cdf15
     eu-west-1:
-      NATHVM64: ami-5bc6c23d
+      NATHVM64: ami-024107e3e3217a248
     eu-west-2:
-      NATHVM64: ami-17c4d073
+      NATHVM64: ami-0ca65a55561666293
     eu-central-1:
-      NATHVM64: ami-0469bb6b
+      NATHVM64: ami-06a5303d47fbd8c60
 Resources:
   ConfigS3Bucket:
     Type: AWS::S3::Bucket
@@ -353,15 +362,15 @@ Resources:
       GroupDescription: NAT Security Group
       VpcId: !Ref VPC
       SecurityGroupIngress:
-      - IpProtocol: -1
+      - IpProtocol: '-1'
         CidrIp: !Ref VPCCidrBlock
       - IpProtocol: tcp
-        FromPort: '22'
-        ToPort: '22'
+        FromPort: 22
+        ToPort: 22
         CidrIp: !Ref NATServerAccessCidrBlock1
       - IpProtocol: udp
-        FromPort: '1194'
-        ToPort: '1194'
+        FromPort: 1194
+        ToPort: 1194
         CidrIp: !Ref NATServerAccessCidrBlock1
       Tags:
       - Key: Environment
@@ -379,12 +388,13 @@ Resources:
             - ec2.amazonaws.com
           Action:
           - sts:AssumeRole
-      Path: "/"
-  NATInstanceRolePolicies:
-    Type: AWS::IAM::Policy
+      ManagedPolicyArns:
+        - !Ref NATInstanceManagedPolicy
+  NATInstanceManagedPolicy:
+    Type: AWS::IAM::ManagedPolicy
     Properties:
-      PolicyName: NATInstancePolicy
       PolicyDocument:
+        Version: "2012-10-17"
         Statement:
         - Effect: Allow
           Action:
@@ -394,12 +404,9 @@ Resources:
           - ec2:CreateRoute
           - ec2:DescribeRouteTables
           Resource: "*"
-      Roles:
-      - Ref: NATInstanceRole
   NATInstanceProfile:
     Type: AWS::IAM::InstanceProfile
     Properties:
-      Path: "/"
       Roles:
       - Ref: NATInstanceRole
   NATLaunchConfig:
@@ -412,15 +419,14 @@ Resources:
           packages:
             yum:
               aws-cli: []
-              subversion: []
               tcpdump: []
               yum-cron: []
               openvpn: []
+              easy-rsa: []
           files:
             /tmp/nat_init.sh:
               content: !Sub |
                 #!/bin/bash -ex
-                yum update -y
                 sed -i.bak 's/^\(update_messages\|download_updates\|apply_updates\) .*/\1 = yes/g' /etc/yum/yum-cron.conf
                 chkconfig yum-cron on
                 service yum-cron start
@@ -450,8 +456,7 @@ Resources:
             /tmp/vpn_init.sh:
               content: !Sub |
                 #!/bin/bash -ex
-                svn export https://github.com/OpenVPN/easy-rsa.git/trunk/easyrsa3 /etc/openvpn/easy-rsa
-                cat >/etc/openvpn/easy-rsa/vars <<-EOF
+                cat >/usr/share/easy-rsa/3/vars <<-EOF
                 set_var EASYRSA_KEY_SIZE      2048
                 set_var EASYRSA_ALGO          "rsa"
                 set_var EASYRSA_DN            "cn_only"
@@ -465,7 +470,7 @@ Resources:
                 set_var EASYRSA_REQ_EMAIL     "${VPNOrganisationEmail}"
                 set_var EASYRSA_REQ_OU        ""
                 EOF
-                cd /etc/openvpn/easy-rsa
+                cd /usr/share/easy-rsa/3
                 ./easyrsa init-pki
                 ./easyrsa build-ca nopass <<-EOF
                 server CA
@@ -473,10 +478,10 @@ Resources:
                 ./easyrsa gen-dh
                 ./easyrsa build-server-full server nopass
                 cd /etc/openvpn
-                ln -s easy-rsa/pki/dh.pem dh2048.pem
-                ln -s easy-rsa/pki/ca.crt .
-                ln -s easy-rsa/pki/issued/server.crt .
-                ln -s ./easy-rsa/pki/private/server.key .
+                ln -s /usr/share/easy-rsa/3/pki/dh.pem dh2048.pem
+                ln -s /usr/share/easy-rsa/3/pki/ca.crt .
+                ln -s /usr/share/easy-rsa/3/pki/issued/server.crt .
+                ln -s /usr/share/easy-rsa/3/pki/private/server.key .
                 cat >/etc/openvpn/server.conf <<-EOF
                 port 1194
                 proto udp
@@ -501,7 +506,7 @@ Resources:
               owner: "root"
               group: "root"
             /usr/bin/build-client.sh:
-              content: !Sub |
+              content: |
                 #!/bin/bash
 
                 if [[ $# -ne 1 ]] ; then
@@ -511,7 +516,7 @@ Resources:
 
                 echo "Generating client configuration for $CLIENT_NAME..."
 
-                cd /etc/openvpn/easy-rsa
+                cd /usr/share/easy-rsa/3
 
                 CLIENT_NAME=$1
 
@@ -549,7 +554,7 @@ Resources:
 
                 EOF
                 
-                echo "Client OVPN configuration can be found here: /etc/openvpn/easy-rsa/$CLIENT_NAME.ovpn"
+                echo "Client OVPN configuration can be found here: /usr/share/easy-rsa/3/$CLIENT_NAME.ovpn"
               mode: "000700"
               owner: "root"
               group: "root"
@@ -584,7 +589,10 @@ Resources:
       UserData:
         Fn::Base64: !Sub |
           #!/bin/bash -xe
-          yum update -y aws-cfn-bootstrap
+          # Enable EPEL for easy-rsa and then update
+          yum-config-manager --enable epel
+          yum -y update
+
           /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource NATLaunchConfig --region ${AWS::Region}
           /opt/aws/bin/cfn-signal --exit-code 0 --stack ${AWS::StackName} --resource NATServerGroup --region ${AWS::Region}
   NATServerGroup:
@@ -608,20 +616,18 @@ Resources:
         Count: 1
         Timeout: 'PT15M'
   NatAccessSecurityGroup:
-    DependsOn:
-    - NatSecurityGroup
     Type: AWS::EC2::SecurityGroup
     Properties:
       VpcId: !Ref VPC
       GroupDescription: Enable various access from NAT instance to AWS VPC
       SecurityGroupIngress:
       - IpProtocol: tcp
-        FromPort: '22'
-        ToPort: '22'
+        FromPort: 22
+        ToPort: 22
         SourceSecurityGroupId: !Ref NatSecurityGroup
       - IpProtocol: icmp
-        FromPort: '8'
-        ToPort: "-1"
+        FromPort: 8
+        ToPort: -1
         SourceSecurityGroupId: !Ref NatSecurityGroup
       Tags:
       - Key: Environment

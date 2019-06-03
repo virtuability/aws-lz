@@ -44,7 +44,7 @@
   },
   {
     "ParameterKey"    : "NATInstanceType",
-    "ParameterValue"  : "t2.nano"
+    "ParameterValue"  : "t3.nano"
   },
   {
     "ParameterKey"    : "KeyName",
