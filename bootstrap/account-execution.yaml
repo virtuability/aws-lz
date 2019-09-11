@@ -1,0 +1,61 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Single/ or Multi-account execution role for stacksets & Codepipeline deployments.
+  Consider limiting permissions to only those services required
+  (currently AdministratorAccess is granted to allow creation and updates of
+  all services in each account).
+
+Parameters:
+  pSharedServicesAccountId:
+    Type: String
+    Description: AWS Account Id of the Shared Services account (the account in which stacksets and Codepipelines are created).
+    MaxLength: 12
+    MinLength: 12
+
+Conditions:
+  cIsSharedServicesAccount:
+    !Equals [ !Ref pSharedServicesAccountId, !Ref 'AWS::AccountId' ]
+
+Resources:
+  rCrossAccountExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LZCrossAccountExecutionRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                - !Ref pSharedServicesAccountId
+            Action:
+              - sts:AssumeRole
+      Path: /
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  rSharedServicesAccountAdministrationRole:
+    Condition: cIsSharedServicesAccount
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LZSharedServicesAccountAdministrationRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: LZSharedServicesAccountExecutionPolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - sts:AssumeRole
+                Resource:
+                  - "arn:aws:iam::*:role/LZCrossAccountExecutionRole"

@@ -1,0 +1,7 @@
+
+# VSCode
+*.code-workspace
+
+# Cloudformation packaged templates
+*.packaged
+

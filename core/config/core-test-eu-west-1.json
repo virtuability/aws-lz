@@ -1,50 +1,50 @@
 [
   {
     "ParameterKey"    : "VPCCidrBlock",
-    "ParameterValue"  : "172.30.0.0/20"
+    "ParameterValue"  : "172.18.0.0/20"
   },
   {
     "ParameterKey"    : "DBCidrBlock1",
-    "ParameterValue"  : "172.30.1.0/24"
+    "ParameterValue"  : "172.18.1.0/24"
   },
   {
     "ParameterKey"    : "DBCidrBlock2",
-    "ParameterValue"  : "172.30.2.0/24"
+    "ParameterValue"  : "172.18.2.0/24"
   },
   {
     "ParameterKey"    : "DBCidrBlock3",
-    "ParameterValue"  : "172.30.3.0/24"
+    "ParameterValue"  : "172.18.3.0/24"
   },
   {
     "ParameterKey"    : "PrivateCidrBlock1",
-    "ParameterValue"  : "172.30.4.0/24"
+    "ParameterValue"  : "172.18.4.0/24"
   },
   {
     "ParameterKey"    : "PrivateCidrBlock2",
-    "ParameterValue"  : "172.30.5.0/24"
+    "ParameterValue"  : "172.18.5.0/24"
   },
   {
     "ParameterKey"    : "PrivateCidrBlock3",
-    "ParameterValue"  : "172.30.6.0/24"
+    "ParameterValue"  : "172.18.6.0/24"
   },
   {
     "ParameterKey"    : "PublicCidrBlock1",
-    "ParameterValue"  : "172.30.7.0/24"
+    "ParameterValue"  : "172.18.7.0/24"
   },
   {
     "ParameterKey"    : "PublicCidrBlock2",
-    "ParameterValue"  : "172.30.8.0/24"
+    "ParameterValue"  : "172.18.8.0/24"
   },
   {
     "ParameterKey"    : "PublicCidrBlock3",
-    "ParameterValue"  : "172.30.9.0/24"
+    "ParameterValue"  : "172.18.9.0/24"
   },  {
     "ParameterKey"    : "NATServerAccessCidrBlock1",
     "ParameterValue"  : "0.0.0.0/0"
   },
   {
     "ParameterKey"    : "NATInstanceType",
-    "ParameterValue"  : "t3.nano"
+    "ParameterValue"  : "t3.micro"
   },
   {
     "ParameterKey"    : "KeyName",
@@ -60,15 +60,15 @@
   },
   {
     "ParameterKey"    : "VPNCidrBlock",
-    "ParameterValue"  : "10.254.0.0 255.255.255.0"
+    "ParameterValue"  : "10.18.0.0 255.255.255.0"
   },
   {
     "ParameterKey"    : "VPNRouteToAWS",
-    "ParameterValue"  : "172.30.0.0 255.255.240.0"
+    "ParameterValue"  : "172.18.0.0 255.255.240.0"
   },
   {
     "ParameterKey"    : "VPNRouteToVPN",
-    "ParameterValue"  : "10.254.0.0/24"
+    "ParameterValue"  : "10.18.0.0/24"
   },
   {
     "ParameterKey"    : "AZNumber",

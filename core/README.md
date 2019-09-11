@@ -1,9 +1,7 @@
 
 # Core Cloudformation template
 
-This CloudFormation template provides a Core VPC configuration, which includes public, private and database subnets, routing tables etc. It also
-includes a single combined NAT, Bastion & OpenVPN instance. The template currently supports 2 or 3 availability zones (as a parameter) in order to
-keep it simple.
+This CloudFormation template provides a Core VPC configuration, which includes public, private and database subnets, routing tables etc. It also includes a single combined NAT, Bastion & OpenVPN instance. The template currently supports 2 or 3 availability zones (as a parameter) in order to keep things simple.
 
 Note that this stack is not currently built with high availability nor high performance Internet-facing traffic via the NAT instance in mind.
 
@@ -17,15 +15,15 @@ The instructions below assume that the AWS CLI is used; but it's also possible t
 
 2. The following environment variables will need to be set correctly for template and configuration locations before running the commands in the following section (adjust as necessary):
 ```
-TMPL_DIR=$HOME/dev/git/virt/cfn-templates/core/template
-CNF_DIR=$HOME/dev/git/virt/cfn-templates/core/config
-STACK_NAME=core-test
+TMPL_DIR=$HOME/ldev/git/virtuability/aws-lz/core/template
+CNF_DIR=$HOME/ldev/git/virtuability/aws-lz/core/config
+STACK_NAME=core-development
 STACK_REGION=eu-west-1
 ```
 
-3. An existing SSH key (and name) in the AWS region that the CloudFormation stack is created in
+3. An existing SSH key (and name) in the AWS account/region that the CloudFormation stack is created in
 
-4. Adjustment of the CloudFormation parameters as required in the cfn-templates/core/config/$STACK_NAME-parameters.json file
+4. Adjust the CloudFormation parameters as required in the aws-lz/core/config/$STACK_NAME-parameters.json files
 
 5. The necessary administrative permissions to create the stack
 
@@ -33,8 +31,9 @@ STACK_REGION=eu-west-1
 
 The following AWS CLI commands are used to validate the template and create, update etc. the stack:
 ```
-# Consider installing cfn-lint (`pip install --user --upgrade cfn-lint`)
-# for much better (but complimentary) validation than validate-template
+pip3 install --user --upgrade awscli cfn-lint aws-sam-cli
+
+# Validate the template with cfn-lint
 cfn-lint $TMPL_DIR/core.yaml
 
 aws cloudformation validate-template --template-body file://$TMPL_DIR/core.yaml

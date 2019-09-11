@@ -71,7 +71,7 @@ Parameters:
   NATInstanceType:
     Type: String
     Description: NAT instance type
-    Default: t3.nano
+    Default: t3.micro
     AllowedValues: [t3.nano, t3.micro, t3.small, t3.medium, t3.large, t3.xlarge, t3.2xlarge]
   KeyName:
     Description: Name of an existing EC2 KeyPair to enable SSH access to the instances
@@ -152,6 +152,12 @@ Resources:
   ConfigS3Bucket:
     Type: AWS::S3::Bucket
     DeletionPolicy: Retain
+    Properties:
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
   VPC:
     Type: AWS::EC2::VPC
     Properties:
@@ -359,7 +365,7 @@ Resources:
   NatSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
-      GroupDescription: NAT Security Group
+      GroupDescription: !Sub '${AWS::StackName} NAT Security Group'
       VpcId: !Ref VPC
       SecurityGroupIngress:
       - IpProtocol: '-1'
@@ -376,7 +382,7 @@ Resources:
       - Key: Environment
         Value: !Ref AWS::StackName
       - Key: Name
-        Value: NAT Security Group
+        Value: !Sub '${AWS::StackName} NAT'
   NATInstanceRole:
     Type: AWS::IAM::Role
     Properties:
@@ -409,8 +415,8 @@ Resources:
     Properties:
       Roles:
       - Ref: NATInstanceRole
-  NATLaunchConfig:
-    Type: AWS::AutoScaling::LaunchConfiguration
+  NATLaunchTemplate:
+    Type: AWS::EC2::LaunchTemplate
     DependsOn:
     - PrivateRouteTable
     Metadata:
@@ -573,33 +579,47 @@ Resources:
                 files: "/etc/openvpn/server.conf"
                 sources: "/etc/openvpn"
     Properties:
-      InstanceType: !Ref NATInstanceType
-      KeyName: !Ref KeyName
-      SecurityGroups: [ !Ref NatSecurityGroup ]
-      ImageId:
-        Fn::FindInMap:
-        - AWSRegionArch2NATAMI
-        - Ref: AWS::Region
-        - Fn::FindInMap:
-          - AWSInstanceType2NATArch
-          - !Ref NATInstanceType
-          - Arch
-      AssociatePublicIpAddress: true
-      IamInstanceProfile: !Ref NATInstanceProfile
-      UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash -xe
-          # Enable EPEL for easy-rsa and then update
-          yum-config-manager --enable epel
-          yum -y update
+      LaunchTemplateName: !Sub '${AWS::StackName}-nat'
+      LaunchTemplateData:
+        BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            Encrypted: true # Encrypt with default ebs key
+            VolumeSize: 12
+            DeleteOnTermination: true
+        EbsOptimized: true
+        InstanceType: !Ref NATInstanceType
+        KeyName: !Ref KeyName
+        SecurityGroupIds: 
+        - !Ref NatSecurityGroup
+        ImageId:
+          Fn::FindInMap:
+          - AWSRegionArch2NATAMI
+          - Ref: AWS::Region
+          - Fn::FindInMap:
+            - AWSInstanceType2NATArch
+            - !Ref NATInstanceType
+            - Arch
+        IamInstanceProfile:
+          Name: !Ref NATInstanceProfile
+        UserData:
+          Fn::Base64: !Sub |
+            #!/bin/bash -xe
+            # Enable EPEL for easy-rsa and then update
+            yum-config-manager --enable epel
+            yum -y update
 
-          /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource NATLaunchConfig --region ${AWS::Region}
-          /opt/aws/bin/cfn-signal --exit-code 0 --stack ${AWS::StackName} --resource NATServerGroup --region ${AWS::Region}
+            /opt/aws/bin/cfn-init -v --stack ${AWS::StackName} --resource NATLaunchTemplate --region ${AWS::Region}
+            /opt/aws/bin/cfn-signal --exit-code 0 --stack ${AWS::StackName} --resource NATServerGroup --region ${AWS::Region}
   NATServerGroup:
     Type: AWS::AutoScaling::AutoScalingGroup
+    DependsOn:
+    - GatewayToInternet
     Properties:
-      AvailabilityZones: !If [ Create3rdAZ, [ !Select [ 0, !GetAZs '' ], !Select [ 1, !GetAZs '' ], !Select [ 2, !GetAZs '' ] ], [ !Select [ 0, !GetAZs '' ], !Select [ 1, !GetAZs '' ] ] ]
-      LaunchConfigurationName: !Ref NATLaunchConfig
+      # AvailabilityZones: !If [ Create3rdAZ, [ !Select [ 0, !GetAZs '' ], !Select [ 1, !GetAZs '' ], !Select [ 2, !GetAZs '' ] ], [ !Select [ 0, !GetAZs '' ], !Select [ 1, !GetAZs '' ] ] ]
+      LaunchTemplate:
+        LaunchTemplateId: !Ref NATLaunchTemplate
+        Version: !GetAtt NATLaunchTemplate.LatestVersionNumber
       MinSize: '1'
       MaxSize: '1'
       DesiredCapacity: '1'
@@ -612,9 +632,14 @@ Resources:
         Value: NAT
         PropagateAtLaunch: true
     CreationPolicy:
+      AutoScalingCreationPolicy:
+        MinSuccessfulInstancesPercent: 100
       ResourceSignal:
         Count: 1
-        Timeout: 'PT15M'
+        Timeout: PT8M
+    UpdatePolicy:
+      AutoScalingReplacingUpdate:
+        WillReplace: true
   NatAccessSecurityGroup:
     Type: AWS::EC2::SecurityGroup
     Properties:
