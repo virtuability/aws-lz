@@ -38,7 +38,8 @@
   {
     "ParameterKey"    : "PublicCidrBlock3",
     "ParameterValue"  : "172.17.9.0/24"
-  },  {
+  },
+  {
     "ParameterKey"    : "NATServerAccessCidrBlock1",
     "ParameterValue"  : "0.0.0.0/0"
   },

@@ -582,12 +582,13 @@ Resources:
       LaunchTemplateName: !Sub '${AWS::StackName}-nat'
       LaunchTemplateData:
         BlockDeviceMappings:
-        - DeviceName: /dev/sda1
+        # Amazon Linux uses /dev/xvda - others use /dev/sda1
+        - DeviceName: /dev/xvda
           Ebs:
             Encrypted: true # Encrypt with default ebs key
             VolumeSize: 12
             DeleteOnTermination: true
-        EbsOptimized: true
+        # EbsOptimized: true
         InstanceType: !Ref NATInstanceType
         KeyName: !Ref KeyName
         SecurityGroupIds: 
@@ -663,6 +664,11 @@ Outputs:
     Value: !Ref VPC
     Export:
       Name: !Sub "${AWS::StackName}-VPC"
+  VPCCidrBlock:
+    Description: VPC CIDR Block
+    Value: !Ref VPCCidrBlock
+    Export:
+      Name: !Sub "${AWS::StackName}-VPCCidrBlock"
   PublicSubnet1:
     Description: Public Subnet 1
     Value: !Ref PublicSubnet1
