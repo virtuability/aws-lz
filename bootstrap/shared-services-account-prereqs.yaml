@@ -1,0 +1,130 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Shared Services AWS account Pipeline Encryption Key and S3 bucket for staging pipeline-related content.
+
+Parameters:
+
+  pDevelopmentAccount:
+    Type: String
+    AllowedPattern: '[\d]{12}'
+
+  pTestAccount:
+    Type: String
+    AllowedPattern: '[\d]{12}'
+
+  pProductionAccount:
+    Type: String
+    AllowedPattern: '[\d]{12}'
+
+Resources:
+
+  rPipelineEncryptionKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: 'Used by Assumed Roles in AWS accounts to Encrypt/Decrypt code'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: "2012-10-17"
+        Id: !Ref 'AWS::StackName'
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS:
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+          Action:
+          - 'kms:Create*'
+          - 'kms:Describe*'
+          - 'kms:Enable*'
+          - 'kms:List*'
+          - 'kms:Put*'
+          - 'kms:Update*'
+          - 'kms:Revoke*'
+          - 'kms:Disable*'
+          - 'kms:Get*'
+          - 'kms:Delete*'
+          - 'kms:ScheduleKeyDeletion'
+          - 'kms:CancelKeyDeletion'
+          Resource: "*"
+        - Effect: Allow
+          Principal:
+            AWS:
+            - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+            - !Sub 'arn:aws:iam::${pDevelopmentAccount}:root'
+            - !Sub 'arn:aws:iam::${pTestAccount}:root'
+            - !Sub 'arn:aws:iam::${pProductionAccount}:root'
+          Action:
+          - kms:Encrypt
+          - kms:Decrypt
+          - kms:ReEncrypt*
+          - kms:GenerateDataKey*
+          - kms:DescribeKey
+          Resource: "*"
+
+  rPipelineEncryptionKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: 'alias/pipeline'
+      TargetKeyId: !Ref rPipelineEncryptionKey
+
+  rArtifactBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration: 
+        - ServerSideEncryptionByDefault:
+            SSEAlgorithm: 'aws:kms'
+            KMSMasterKeyID: !Ref rPipelineEncryptionKey
+
+  rArtifactBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref rArtifactBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+            - s3:PutObject
+            - s3:GetBucketPolicy
+            - s3:GetObject
+            - s3:ListBucket
+            Effect: Allow
+            Resource:
+            - !Sub 'arn:aws:s3:::${rArtifactBucket}'
+            - !Sub 'arn:aws:s3:::${rArtifactBucket}/*'
+            Principal:
+              AWS:
+              - !Sub 'arn:aws:iam::${AWS::AccountId}:root'
+              - !Sub 'arn:aws:iam::${pDevelopmentAccount}:root'
+              - !Sub 'arn:aws:iam::${pTestAccount}:root'
+              - !Sub 'arn:aws:iam::${pProductionAccount}:root'
+
+Outputs:
+  oPipelineEncryptionKey:
+    Description: 'KMS Encryption Key for the Code Pipeline'
+    Value: !Ref rPipelineEncryptionKey
+    Export:
+      Name: 'PipelineEncryptionKey'
+
+  oPipelineEncryptionKeyArn:
+    Description: 'KMS Encryption Key ARN for the Code Pipeline'
+    Value: !GetAtt rPipelineEncryptionKey.Arn
+    Export:
+      Name: 'PipelineEncryptionKeyArn'
+
+  oPipelineArtifactBucket:
+    Description: 'S3 artifact bucket for the Code Pipeline'
+    Value: !Ref rArtifactBucket
+    Export:
+      Name: 'PipelineArtifactBucket'
+
+  oPipelineArtifactBucketArn:
+    Description: 'S3 artifact bucket ARN for the Code Pipeline'
+    Value: !GetAtt rArtifactBucket.Arn
+    Export:
+      Name: 'PipelineArtifactBucketArn'
+
+  oSharedServicesAccountId:
+    Description: 'Shared Services AWS Account Id'
+    Value: !Ref 'AWS::AccountId'
+    Export:
+      Name: 'SharedServicesAccountId'

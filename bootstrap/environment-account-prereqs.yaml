@@ -1,0 +1,301 @@
+---
+AWSTemplateFormatVersion: 2010-09-09
+Description: >
+  Single and Multi-account execution roles for Stack Sets & Codepipeline deployments.
+  Consider limiting permissions to only those services required
+  (currently AdministratorAccess is granted to allow creation and updates of
+  all services in each account).
+
+Parameters:
+  pSharedServicesAccountId:
+    Type: String
+    Description: 'AWS Account Id of the Shared Services account (the account in which Codepipelines are created).'
+    AllowedPattern: '[\d]{12}'
+
+  pPipelineArtifactBucketArn:
+    Type: String
+    Description: ARN of the Shared Services account artifact S3 bucket used for Codepipelines
+
+  pPipelineEncryptionKeyArn:
+    Type: String
+    Description: ARN of the Shared Services account KMS key used for Codepipelines
+
+Resources:
+
+################################################################################
+#
+# Cross-Account Pipeline role
+#
+################################################################################
+  rCrossAccountPipelineRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LZCrossAccountPipelineRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            AWS:
+            - !Sub 'arn:aws:iam::${pSharedServicesAccountId}:root'
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: LZSharedServicesCloudformationPolicy
+        PolicyDocument:
+          Version: 2012-10-17
+          Statement:
+          # Allow assuming and passing Cloudformation role on (to Cloudformation)
+          - Effect: Allow
+            Action:
+            - sts:AssumeRole
+            - iam:PassRole
+            Resource:
+            - !GetAtt rCrossAccountCloudformationRole.Arn
+          # Allow change set 
+          - Effect: Allow
+            Action:
+            - cloudformation:CreateStack
+            - cloudformation:DeleteStack
+            - cloudformation:DescribeStacks
+            - cloudformation:UpdateStack
+            - cloudformation:CreateChangeSet
+            - cloudformation:DeleteChangeSet
+            - cloudformation:DescribeChangeSet
+            - cloudformation:ExecuteChangeSet
+            - cloudformation:SetStackPolicy
+            - cloudformation:ValidateTemplate
+            Resource:
+            - '*'
+          - Effect: Allow
+            Action:
+            - s3:ListBucket
+            - s3:PutObject
+            - s3:GetObject
+            - s3:GetObjectVersion
+            - s3:GetBucketVersioning
+            Resource:
+            - !Sub '${pPipelineArtifactBucketArn}'
+            - !Sub '${pPipelineArtifactBucketArn}/*'
+          - Effect: Allow
+            Action:
+            - kms:Decrypt
+            Resource: !Sub '${pPipelineEncryptionKeyArn}'
+
+################################################################################
+#
+# Cross-Account Cloudformation role
+#
+################################################################################
+  rCrossAccountCloudformationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LZCrossAccountCloudformationRole
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - cloudformation.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      # TODO: Tighten down the Cloudformation permissions to minimum required to build stack
+      ManagedPolicyArns:
+      - 'arn:aws:iam::aws:policy/AdministratorAccess'
+
+################################################################################
+#
+# Log Group Encryption
+#
+################################################################################
+  rCloudWatchLogGroupKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Used to encrypt log groups
+      KeyPolicy:
+        Version: "2012-10-17"
+        Statement:
+        - Sid: Enable IAM User Permissions
+          Effect: Allow
+          Principal:
+            AWS:
+            - !Sub arn:aws:iam::${AWS::AccountId}:root
+          Action: kms:*
+          Resource: "*"
+        - Sid: Enable log service Permissions
+          Effect: Allow
+          Principal:
+            Service: !Sub logs.${AWS::Region}.amazonaws.com
+          Action:
+          - kms:Encrypt*
+          - kms:Decrypt*
+          - kms:ReEncrypt*
+          - kms:GenerateDataKey*
+          - kms:Describe*
+          Resource: "*"
+  
+  rCloudWatchLogGroupKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: 'alias/cloudwatch-log'
+      TargetKeyId: !Ref rCloudWatchLogGroupKey
+
+  rCloudWatchLogGroupKeyAssociationFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      Code:
+        ZipFile: |
+          import boto3
+          from botocore.vendored import requests
+          import json
+
+          client = boto3.client("logs")
+
+          # From: https://docs.aws.amazon.com/AWSCloudFormation/latest/UserGuide/cfn-lambda-function-code-cfnresponsemodule.html
+          SUCCESS = "SUCCESS"
+          FAILED = "FAILED"
+
+          def send(event, context, responseStatus, responseData, physicalResourceId=None, noEcho=False):
+              responseUrl = event['ResponseURL']
+
+              print(responseUrl)
+
+              responseBody = {}
+              responseBody['Status'] = responseStatus
+              responseBody['Reason'] = 'See the details in CloudWatch Log Stream: ' + context.log_stream_name
+              responseBody['PhysicalResourceId'] = physicalResourceId or context.log_stream_name
+              responseBody['StackId'] = event['StackId']
+              responseBody['RequestId'] = event['RequestId']
+              responseBody['LogicalResourceId'] = event['LogicalResourceId']
+              responseBody['NoEcho'] = noEcho
+              responseBody['Data'] = responseData
+
+              json_responseBody = json.dumps(responseBody)
+
+              print("Response body:\n" + json_responseBody)
+
+              headers = {
+                  'content-type' : '',
+                  'content-length' : str(len(json_responseBody))
+              }
+
+              try:
+                  response = requests.put(responseUrl,
+                                          data=json_responseBody,
+                                          headers=headers)
+                  print('Status code: ' + response.reason)
+              except Exception as e:
+                  print('send(..) failed executing requests.put(..): ' + str(e))
+
+          def associate_key(log_group_name, key_arn):
+              client.associate_kms_key(
+                  logGroupName=log_group_name,
+                  kmsKeyId=key_arn,
+              )
+
+          def disassociate_key(log_group_name):
+              client.disassociate_kms_key(
+                  logGroupName=log_group_name,
+              )
+
+          def handler(event, context):
+              print("Received request:", json.dumps(event, indent=2))
+
+              try:
+                  request = event["RequestType"]
+                  properties = event["ResourceProperties"]
+
+                  if any(key not in properties for key in ('KeyArn', 'LogGroupName')):
+                      return send(event, context, "FAILED", { 'Data': 'Missing required parameters' } )
+
+                  log_group_name = properties['LogGroupName']
+                  key_arn = properties['KeyArn']
+
+                  if request == "Create":
+                      associate_key(log_group_name, key_arn)
+                      send(event, context, SUCCESS, { 'Data': 'Created' } )
+
+                  elif request == "Update":
+                      associate_key(log_group_name, key_arn)
+                      send(event, context, SUCCESS, { 'Data': 'Updated' } )
+
+                  elif request == "Delete":
+                      disassociate_key(log_group_name)
+                      send(event, context, SUCCESS, { 'Data': 'Deleted' } )
+
+                  else:
+                      send(event, context, FAILED, { 'Data': 'Unexpected: {}'.format(request) } )
+
+              except Exception as e:
+                  print('Unexpected exception: ' + str(e))
+                  send(event, context, FAILED, { 'Data': str(e) } )
+
+      Description: >
+        Associates a KMS key with a CloudWatch Log group.
+        Inputs are: "KeyArn", "LogGroupName"
+      Handler: index.handler
+      Role: !GetAtt rCloudWatchLogGroupKeyAssociationRole.Arn
+      Runtime: python3.7
+
+  rCloudWatchLogGroupKeyAssociationRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: allow-loggroup-key-association
+        PolicyDocument:
+          Version: "2012-10-17"
+          Statement:
+          - Effect: Allow
+            Action:
+            - kms:GetKeyPolicy
+            Resource: !GetAtt rCloudWatchLogGroupKey.Arn
+          - Effect: Allow
+            Action: logs:*
+            Resource: 'arn:aws:logs:*:*:*'
+
+Outputs:
+  oCrossAccountPipelineRoleArn:
+    Description: 'Cross-account role for Pipeline'
+    Value: !GetAtt rCrossAccountPipelineRole.Arn
+    Export:
+      Name: 'CrossAccountPipelineRoleArn'
+
+  oCrossAccountCloudformationRoleArn:
+    Description: 'Cross-account role for Cloudformation'
+    Value: !Ref rCrossAccountCloudformationRole
+    Export:
+      Name: 'CrossAccountCloudformationRoleArn'
+
+  oCloudWatchLogGroupKey:
+    Description: 'CloudWatch Logs encryption key'
+    Value: !Ref rCloudWatchLogGroupKey
+    Export:
+      Name: 'CloudWatchLogGroupKey'
+
+  oCloudWatchLogGroupKeyArn:
+    Description: 'CloudWatch Logs encryption key ARN'
+    Value: !GetAtt rCloudWatchLogGroupKey.Arn
+    Export:
+      Name: 'CloudWatchLogGroupKeyArn'
+
+  oCloudWatchLogGroupKeyAssociationFunction:
+    Description: 'CloudWatch Logs encryption key association function'
+    Value: !Ref rCloudWatchLogGroupKeyAssociationFunction
+    Export:
+      Name: 'CloudWatchLogGroupKeyAssociationFunction'
+
+  oCloudWatchLogGroupKeyAssociationFunctionArn:
+    Description: 'CloudWatch Logs encryption key association function ARN'
+    Value: !GetAtt rCloudWatchLogGroupKeyAssociationFunction.Arn
+    Export:
+      Name: 'CloudWatchLogGroupKeyAssociationFunctionArn'
