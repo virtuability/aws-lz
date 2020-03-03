@@ -111,7 +111,7 @@ Parameters:
   EasyRSAReqCountryDesc:
     Type: String
     Description: Which country code to use for EASYRSA_REQ_COUNTRY when generating the certificate.
-    Default: UK
+    Default: IE
 Conditions:
     Create3rdAZ: !Equals [ !Ref AZNumber, 3 ]
 Mappings:
@@ -151,7 +151,8 @@ Mappings:
 Resources:
   ConfigS3Bucket:
     Type: AWS::S3::Bucket
-    DeletionPolicy: Retain
+#    DeletionPolicy: Retain
+#    UpdateReplacePolicy: Retain
     Properties:
       AccessControl: Private
       BucketEncryption:
@@ -203,6 +204,8 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: Name
         Value: Public Subnet
+      - Key: kubernetes.io/role/elb
+        Value: '1'
   PublicSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -215,6 +218,8 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: Name
         Value: Public Subnet
+      - Key: kubernetes.io/role/elb
+        Value: '1'
   PublicSubnet3:
     Type: AWS::EC2::Subnet
     Condition: Create3rdAZ
@@ -228,6 +233,8 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: Name
         Value: Public Subnet
+      - Key: kubernetes.io/role/elb
+        Value: '1'
   PublicSubnetRouteTableAssoc1:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:
@@ -263,6 +270,8 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: Name
         Value: Private Subnet
+      - Key: kubernetes.io/role/internal-elb
+        Value: '1'
   PrivateSubnet2:
     Type: AWS::EC2::Subnet
     Properties:
@@ -275,6 +284,8 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: Name
         Value: Private Subnet
+      - Key: kubernetes.io/role/internal-elb
+        Value: '1'
   PrivateSubnet3:
     Type: AWS::EC2::Subnet
     Condition: Create3rdAZ
@@ -288,6 +299,8 @@ Resources:
         Value: !Ref AWS::StackName
       - Key: Name
         Value: Private Subnet
+      - Key: kubernetes.io/role/internal-elb
+        Value: '1'
   PrivateSubnetRouteTableAssoc1:
     Type: AWS::EC2::SubnetRouteTableAssociation
     Properties:

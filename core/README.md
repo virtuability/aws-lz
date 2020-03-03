@@ -16,8 +16,8 @@ The instructions below assume that the AWS CLI is used; but it's also possible t
 2. The following environment variables will need to be set correctly for template and configuration locations before running the commands in the following section (adjust as necessary):
 
 ```bash
-TMPL_DIR=$HOME/ldev/git/virtuability/aws-lz/core/template
-CNF_DIR=$HOME/ldev/git/virtuability/aws-lz/core/config
+TMPL_DIR=$HOME/dev/git/virtuability/aws-lz/core/template
+CNF_DIR=$HOME/dev/git/virtuability/aws-lz/core/config
 STACK_NAME=core-development
 STACK_REGION=eu-west-1
 ```
@@ -69,7 +69,7 @@ The utility script /usr/bin/build-client.sh in the NAT VM can create the OpenVPN
 
 Simply login to the NAT instance via SSH and run the script as the `root` user and provide a client name, e.g. "client1", as parameter:
 
-```
+```bash
 /usr/bin/build-client.sh client1
 ```
 

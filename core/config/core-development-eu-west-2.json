@@ -1,43 +1,43 @@
 [
   {
     "ParameterKey"    : "VPCCidrBlock",
-    "ParameterValue"  : "172.21.0.0/20"
+    "ParameterValue"  : "172.21.16.0/20"
   },
   {
     "ParameterKey"    : "DBCidrBlock1",
-    "ParameterValue"  : "172.21.1.0/24"
+    "ParameterValue"  : "172.21.17.0/24"
   },
   {
     "ParameterKey"    : "DBCidrBlock2",
-    "ParameterValue"  : "172.21.2.0/24"
+    "ParameterValue"  : "172.21.18.0/24"
   },
   {
     "ParameterKey"    : "DBCidrBlock3",
-    "ParameterValue"  : "172.21.3.0/24"
+    "ParameterValue"  : "172.21.19.0/24"
   },
   {
     "ParameterKey"    : "PrivateCidrBlock1",
-    "ParameterValue"  : "172.21.4.0/24"
+    "ParameterValue"  : "172.21.20.0/24"
   },
   {
     "ParameterKey"    : "PrivateCidrBlock2",
-    "ParameterValue"  : "172.21.5.0/24"
+    "ParameterValue"  : "172.21.21.0/24"
   },
   {
     "ParameterKey"    : "PrivateCidrBlock3",
-    "ParameterValue"  : "172.21.6.0/24"
+    "ParameterValue"  : "172.21.22.0/24"
   },
   {
     "ParameterKey"    : "PublicCidrBlock1",
-    "ParameterValue"  : "172.21.7.0/24"
+    "ParameterValue"  : "172.21.23.0/24"
   },
   {
     "ParameterKey"    : "PublicCidrBlock2",
-    "ParameterValue"  : "172.21.8.0/24"
+    "ParameterValue"  : "172.21.24.0/24"
   },
   {
     "ParameterKey"    : "PublicCidrBlock3",
-    "ParameterValue"  : "172.21.9.0/24"
+    "ParameterValue"  : "172.21.25.0/24"
   },
   {
     "ParameterKey"    : "NATServerAccessCidrBlock1",
@@ -61,18 +61,18 @@
   },
   {
     "ParameterKey"    : "VPNCidrBlock",
-    "ParameterValue"  : "10.21.0.0 255.255.255.0"
+    "ParameterValue"  : "10.21.16.0 255.255.240.0"
   },
   {
     "ParameterKey"    : "VPNRouteToAWS",
-    "ParameterValue"  : "172.21.0.0 255.255.240.0"
+    "ParameterValue"  : "172.21.16.0 255.255.240.0"
   },
   {
     "ParameterKey"    : "VPNRouteToVPN",
-    "ParameterValue"  : "10.21.0.0/24"
+    "ParameterValue"  : "10.21.16.0/20"
   },
   {
     "ParameterKey"    : "AZNumber",
-    "ParameterValue"  : "2"
+    "ParameterValue"  : "3"
   }
 ]
